@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Imalink Desktop</title>
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+
+  <body>
+    <main class="container">
+      <h1>Imalink Desktop</h1>
+      <p>Batch import av bilder til Imalink backend via imalink-core</p>
+
+      <div class="section">
+        <h2>1. API Konfiguration</h2>
+        <div class="controls">
+          <label for="core-url">imalink-core API URL:</label>
+          <input 
+            type="text" 
+            id="core-url" 
+            value="http://localhost:8765" 
+            placeholder="http://localhost:8765"
+          />
+        </div>
+        <div class="controls">
+          <label for="backend-url">Imalink Backend URL:</label>
+          <input 
+            type="text" 
+            id="backend-url" 
+            value="http://localhost:8000" 
+            placeholder="http://localhost:8000"
+          />
+        </div>
+        <div class="controls">
+          <label for="auth-token">Auth Token:</label>
+          <input 
+            type="password" 
+            id="auth-token" 
+            placeholder="Bearer token"
+          />
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>2. Import Session Metadata</h2>
+        <div class="controls">
+          <label for="session-title">Tittel (valgfritt):</label>
+          <input 
+            type="text" 
+            id="session-title" 
+            placeholder="Eksempel: Italia Sommer 2024"
+          />
+        </div>
+        <div class="controls">
+          <label for="session-description">Beskrivelse (valgfritt):</label>
+          <textarea 
+            id="session-description" 
+            rows="3"
+            placeholder="Beskrivelse av importen..."
+          ></textarea>
+        </div>
+        <div class="controls">
+          <label for="author-id">Default Author ID (valgfritt):</label>
+          <input 
+            type="number" 
+            id="author-id" 
+            placeholder="Fotograf ID"
+          />
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>3. Velg Katalog</h2>
+        <div class="controls">
+          <button id="select-dir">Velg katalog med bilder</button>
+          <span id="selected-dir"></span>
+        </div>
+        <div id="file-list" style="display: none;">
+          <h3>Funnet filer:</h3>
+          <div id="files"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>4. Start Import</h2>
+        <div class="controls">
+          <button id="start-import" disabled>Start Import</button>
+        </div>
+      </div>
+
+      <div id="status"></div>
+      
+      <div id="progress" style="display: none;">
+        <h2>Import Progress</h2>
+        <div class="progress-bar">
+          <div id="progress-fill"></div>
+        </div>
+        <div id="progress-text"></div>
+      </div>
+
+      <div id="results" style="display: none;">
+        <h2>Import Results</h2>
+        <div id="results-content"></div>
+      </div>
+    </main>
+  </body>
+</html>
