@@ -11,6 +11,10 @@ pub struct User {
     pub email: String,
     pub display_name: String,
     pub is_active: bool,
+    #[serde(default)]
+    pub created_at: Option<String>,
+    #[serde(default)]
+    pub updated_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
