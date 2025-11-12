@@ -26,6 +26,14 @@ pub struct LoginResponse {
     pub user: User,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub display_name: String,
+}
+
 // PhotoEgg structure - matches imalink-core API response
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PhotoEgg {
@@ -376,6 +384,49 @@ async fn login(
 }
 
 #[tauri::command]
+async fn register(
+    backend_url: String,
+    username: String,
+    email: String,
+    password: String,
+    display_name: String,
+) -> Result<User, String> {
+    let client = reqwest::Client::new();
+    
+    let request_body = RegisterRequest {
+        username,
+        email,
+        password,
+        display_name,
+    };
+    
+    let response = client
+        .post(format!("{}/api/v1/auth/register", backend_url))
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to server: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "Registration failed ({}): {}",
+            status,
+            if error_text.is_empty() { "Registration error" } else { &error_text }
+        ));
+    }
+    
+    let user: User = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse registration response: {}", e))?;
+    
+    Ok(user)
+}
+
+#[tauri::command]
 async fn logout(
     backend_url: String,
     auth_token: String,
@@ -442,6 +493,7 @@ pub fn run() {
             create_import_session,
             upload_photoegg,
             login,
+            register,
             logout,
             validate_token
         ])

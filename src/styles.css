@@ -140,6 +140,44 @@ button:disabled {
   color: #721c24;
 }
 
+#register-status {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 14px;
+}
+
+#register-status.loading {
+  background: #fff3cd;
+  color: #856404;
+}
+
+#register-status.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+#register-status.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.auth-toggle {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.auth-toggle a {
+  color: #0070f3;
+  text-decoration: none;
+}
+
+.auth-toggle a:hover {
+  text-decoration: underline;
+}
+
 /* Main Screen Header */
 .user-header {
   display: flex;

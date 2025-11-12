@@ -350,7 +350,7 @@ async function handleLogin() {
   
   const username = usernameInput?.value;
   const password = passwordInput?.value;
-  const backendUrl = backendUrlInput?.value || "http://localhost:8000";
+  const backendUrl = backendUrlInput?.value || "https://api.trollfjell.com";
   
   if (!username || !password) {
     if (loginStatus) {
@@ -392,6 +392,89 @@ async function handleLogin() {
   } finally {
     if (loginBtn) loginBtn.disabled = false;
   }
+}
+
+async function handleRegister() {
+  const usernameInput = document.querySelector("#register-username") as HTMLInputElement;
+  const emailInput = document.querySelector("#register-email") as HTMLInputElement;
+  const passwordInput = document.querySelector("#register-password") as HTMLInputElement;
+  const displayNameInput = document.querySelector("#register-displayname") as HTMLInputElement;
+  const backendUrlInput = document.querySelector("#backend-url") as HTMLInputElement;
+  const registerStatus = document.querySelector("#register-status");
+  const registerBtn = document.querySelector("#register-btn") as HTMLButtonElement;
+  
+  const username = usernameInput?.value;
+  const email = emailInput?.value;
+  const password = passwordInput?.value;
+  const displayName = displayNameInput?.value;
+  const backendUrl = backendUrlInput?.value || "https://api.trollfjell.com";
+  
+  if (!username || !email || !password || !displayName) {
+    if (registerStatus) {
+      registerStatus.textContent = "Alle felter er påkrevd";
+      registerStatus.className = "error";
+    }
+    return;
+  }
+  
+  if (registerBtn) registerBtn.disabled = true;
+  if (registerStatus) {
+    registerStatus.textContent = "Oppretter bruker...";
+    registerStatus.className = "loading";
+  }
+  
+  try {
+    const user: User = await invoke("register", {
+      backendUrl,
+      username,
+      email,
+      password,
+      displayName
+    });
+    
+    if (registerStatus) {
+      registerStatus.textContent = `✓ Bruker opprettet! Logger inn...`;
+      registerStatus.className = "success";
+    }
+    
+    // Auto-login after successful registration
+    setTimeout(() => {
+      if (usernameInput) usernameInput.value = "";
+      if (emailInput) emailInput.value = "";
+      if (passwordInput) passwordInput.value = "";
+      if (displayNameInput) displayNameInput.value = "";
+      showLoginForm();
+      
+      // Pre-fill username for login
+      const loginUsernameInput = document.querySelector("#login-username") as HTMLInputElement;
+      if (loginUsernameInput) loginUsernameInput.value = user.username;
+    }, 1500);
+    
+  } catch (error) {
+    if (registerStatus) {
+      registerStatus.textContent = `Registrering feilet: ${error}`;
+      registerStatus.className = "error";
+    }
+    console.error("Registration failed:", error);
+  } finally {
+    if (registerBtn) registerBtn.disabled = false;
+  }
+}
+
+function showLoginForm() {
+  const loginForm = document.querySelector("#login-form") as HTMLElement;
+  const registerForm = document.querySelector("#register-form") as HTMLElement;
+  
+  if (loginForm) loginForm.style.display = "block";
+  if (registerForm) registerForm.style.display = "none";
+}
+
+function showRegisterForm() {
+  const loginForm = document.querySelector("#login-form") as HTMLElement;
+  const registerForm = document.querySelector("#register-form") as HTMLElement;
+  
+  if (loginForm) loginForm.style.display = "none";
+  if (registerForm) registerForm.style.display = "block";
 }
 
 async function handleLogout() {
@@ -455,10 +538,30 @@ window.addEventListener("DOMContentLoaded", () => {
   // Login screen event listeners
   const loginBtn = document.querySelector("#login-btn");
   const loginForm = document.querySelector("#login-form");
+  const registerBtn = document.querySelector("#register-btn");
+  const registerForm = document.querySelector("#register-form");
+  const showRegisterLink = document.querySelector("#show-register");
+  const showLoginLink = document.querySelector("#show-login");
   
   loginBtn?.addEventListener("click", handleLogin);
   loginForm?.addEventListener("submit", (e) => {
     e.preventDefault();
     handleLogin();
+  });
+  
+  registerBtn?.addEventListener("click", handleRegister);
+  registerForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handleRegister();
+  });
+  
+  showRegisterLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    showRegisterForm();
+  });
+  
+  showLoginLink?.addEventListener("click", (e) => {
+    e.preventDefault();
+    showLoginForm();
   });
 });
