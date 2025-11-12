@@ -2,6 +2,30 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
 
+// ===== Authentication Structures =====
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct User {
+    pub id: i32,
+    pub username: String,
+    pub email: String,
+    pub display_name: String,
+    pub is_active: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub user: User,
+}
+
 // PhotoEgg structure - matches imalink-core API response
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PhotoEgg {
@@ -270,8 +294,6 @@ async fn upload_photoegg(
     import_session_id: i32,
     auth_token: String,
 ) -> Result<PhotoEggResponse, String> {
-    use std::path::Path;
-    
     let client = reqwest::Client::new();
     
     // Note: We don't have file_path or file_size here since we're working with PhotoEgg
@@ -312,18 +334,116 @@ async fn upload_photoegg(
     Ok(photoegg_response)
 }
 
+// ===== Authentication Commands =====
+
+#[tauri::command]
+async fn login(
+    backend_url: String,
+    username: String,
+    password: String,
+) -> Result<LoginResponse, String> {
+    let client = reqwest::Client::new();
+    
+    let request_body = LoginRequest {
+        username,
+        password,
+    };
+    
+    let response = client
+        .post(format!("{}/api/v1/auth/login", backend_url))
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to server: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "Login failed ({}): {}",
+            status,
+            if error_text.is_empty() { "Invalid credentials" } else { &error_text }
+        ));
+    }
+    
+    let login_response: LoginResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse login response: {}", e))?;
+    
+    Ok(login_response)
+}
+
+#[tauri::command]
+async fn logout(
+    backend_url: String,
+    auth_token: String,
+) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    
+    let response = client
+        .post(format!("{}/api/v1/auth/logout", backend_url))
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to server: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "Logout failed ({}): {}",
+            status, error_text
+        ));
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn validate_token(
+    backend_url: String,
+    auth_token: String,
+) -> Result<User, String> {
+    let client = reqwest::Client::new();
+    
+    let response = client
+        .get(format!("{}/api/v1/auth/me", backend_url))
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to connect to server: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        return Err(format!("Token validation failed: {}", status));
+    }
+    
+    let user: User = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse user response: {}", e))?;
+    
+    Ok(user)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             greet, 
             process_image_file, 
             scan_directory,
             create_import_session,
-            upload_photoegg
+            upload_photoegg,
+            login,
+            logout,
+            validate_token
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

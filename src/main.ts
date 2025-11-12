@@ -1,5 +1,28 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Store } from "@tauri-apps/plugin-store";
+
+// ===== Authentication Interfaces =====
+
+interface User {
+  id: number;
+  username: string;
+  email: string;
+  display_name: string;
+  is_active: boolean;
+}
+
+interface LoginResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+// ===== Global State =====
+
+let authToken: string | null = null;
+let currentUser: User | null = null;
+let credentialsStore: Store | null = null;
 
 // PhotoEgg structure - matches imalink-core v2.0 API response
 interface PhotoEgg {
@@ -148,21 +171,19 @@ async function startImport() {
   // Get configuration
   const coreUrlInput = document.querySelector("#core-url") as HTMLInputElement;
   const backendUrlInput = document.querySelector("#backend-url") as HTMLInputElement;
-  const authTokenInput = document.querySelector("#auth-token") as HTMLInputElement;
   const titleInput = document.querySelector("#session-title") as HTMLInputElement;
   const descriptionInput = document.querySelector("#session-description") as HTMLTextAreaElement;
   const authorIdInput = document.querySelector("#author-id") as HTMLInputElement;
 
   const coreApiUrl = coreUrlInput?.value || "http://localhost:8765";
   const backendUrl = backendUrlInput?.value || "http://localhost:8000";
-  const authToken = authTokenInput?.value;
   const title = titleInput?.value || null;
   const description = descriptionInput?.value || null;
   const authorId = authorIdInput?.value ? parseInt(authorIdInput.value) : null;
 
   if (!authToken) {
     if (statusEl) {
-      statusEl.textContent = "Feil: Auth token er påkrevd";
+      statusEl.textContent = "Feil: Du må være innlogget";
       statusEl.className = "error";
     }
     return;
@@ -287,10 +308,157 @@ async function startImport() {
   }
 }
 
+// ===== Authentication Functions =====
+
+async function initializeAuth() {
+  try {
+    // Initialize store
+    credentialsStore = await Store.load("credentials.json");
+    
+    // Try to load saved token
+    const savedToken = await credentialsStore.get<string>("auth_token");
+    const backendUrl = (document.querySelector("#backend-url") as HTMLInputElement)?.value || "http://localhost:8000";
+    
+    if (savedToken) {
+      // Validate token
+      try {
+        currentUser = await invoke("validate_token", {
+          backendUrl,
+          authToken: savedToken
+        });
+        authToken = savedToken;
+        showMainScreen();
+      } catch {
+        // Token invalid, show login
+        showLoginScreen();
+      }
+    } else {
+      showLoginScreen();
+    }
+  } catch (error) {
+    console.error("Failed to initialize auth:", error);
+    showLoginScreen();
+  }
+}
+
+async function handleLogin() {
+  const usernameInput = document.querySelector("#login-username") as HTMLInputElement;
+  const passwordInput = document.querySelector("#login-password") as HTMLInputElement;
+  const backendUrlInput = document.querySelector("#backend-url") as HTMLInputElement;
+  const loginStatus = document.querySelector("#login-status");
+  const loginBtn = document.querySelector("#login-btn") as HTMLButtonElement;
+  
+  const username = usernameInput?.value;
+  const password = passwordInput?.value;
+  const backendUrl = backendUrlInput?.value || "http://localhost:8000";
+  
+  if (!username || !password) {
+    if (loginStatus) {
+      loginStatus.textContent = "Brukernavn og passord er påkrevd";
+      loginStatus.className = "error";
+    }
+    return;
+  }
+  
+  if (loginBtn) loginBtn.disabled = true;
+  if (loginStatus) {
+    loginStatus.textContent = "Logger inn...";
+    loginStatus.className = "loading";
+  }
+  
+  try {
+    const response: LoginResponse = await invoke("login", {
+      backendUrl,
+      username,
+      password
+    });
+    
+    authToken = response.access_token;
+    currentUser = response.user;
+    
+    // Save token securely
+    if (credentialsStore) {
+      await credentialsStore.set("auth_token", authToken);
+      await credentialsStore.save();
+    }
+    
+    showMainScreen();
+  } catch (error) {
+    if (loginStatus) {
+      loginStatus.textContent = `Innlogging feilet: ${error}`;
+      loginStatus.className = "error";
+    }
+    console.error("Login failed:", error);
+  } finally {
+    if (loginBtn) loginBtn.disabled = false;
+  }
+}
+
+async function handleLogout() {
+  const backendUrl = (document.querySelector("#backend-url") as HTMLInputElement)?.value || "http://localhost:8000";
+  
+  try {
+    if (authToken) {
+      await invoke("logout", {
+        backendUrl,
+        authToken
+      });
+    }
+  } catch (error) {
+    console.error("Logout failed:", error);
+  }
+  
+  // Clear credentials
+  authToken = null;
+  currentUser = null;
+  if (credentialsStore) {
+    await credentialsStore.delete("auth_token");
+    await credentialsStore.save();
+  }
+  
+  showLoginScreen();
+}
+
+function showLoginScreen() {
+  const loginScreen = document.querySelector("#login-screen") as HTMLElement;
+  const mainScreen = document.querySelector("#main-screen") as HTMLElement;
+  
+  if (loginScreen) loginScreen.style.display = "block";
+  if (mainScreen) mainScreen.style.display = "none";
+}
+
+function showMainScreen() {
+  const loginScreen = document.querySelector("#login-screen") as HTMLElement;
+  const mainScreen = document.querySelector("#main-screen") as HTMLElement;
+  const userInfo = document.querySelector("#user-info");
+  
+  if (loginScreen) loginScreen.style.display = "none";
+  if (mainScreen) mainScreen.style.display = "block";
+  if (userInfo && currentUser) {
+    userInfo.textContent = `Innlogget som: ${currentUser.display_name} (${currentUser.username})`;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
+  // Initialize authentication
+  initializeAuth();
+  
+  // Main screen event listeners
   const selectDirBtn = document.querySelector("#select-dir");
   const startImportBtn = document.querySelector("#start-import");
+  const logoutBtn = document.querySelector("#logout-btn");
   
   selectDirBtn?.addEventListener("click", selectDirectory);
   startImportBtn?.addEventListener("click", startImport);
+  logoutBtn?.addEventListener("click", handleLogout);
+  
+  // Login screen event listeners
+  const loginBtn = document.querySelector("#login-btn");
+  const loginForm = document.querySelector("#login-form");
+  
+  loginBtn?.addEventListener("click", handleLogin);
+  loginForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    handleLogin();
+  });
 });
