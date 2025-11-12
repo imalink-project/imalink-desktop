@@ -8,7 +8,7 @@ interface User {
   id: number;
   username: string;
   email: string;
-  display_name: string;
+  display_name: string | null;  // Can be null from backend
   is_active: boolean;
 }
 
@@ -518,7 +518,8 @@ function showMainScreen() {
   if (loginScreen) loginScreen.style.display = "none";
   if (mainScreen) mainScreen.style.display = "block";
   if (userInfo && currentUser) {
-    userInfo.textContent = `Innlogget som: ${currentUser.display_name} (${currentUser.username})`;
+    const displayName = currentUser.display_name || currentUser.username;
+    userInfo.textContent = `Innlogget som: ${displayName} (${currentUser.username})`;
   }
 }
 
