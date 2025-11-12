@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 
+// PhotoEgg structure - matches imalink-core v2.0 API response
 interface PhotoEgg {
   // Identity
   hothash: string;
@@ -41,20 +42,33 @@ interface PhotoEgg {
   lens_make?: string | null;
 }
 
+// ImportSession structure - matches imalink backend API v2.3
 interface ImportSession {
   id: number;
-  imported_at: string;
-  title?: string | null;
+  user_id: number;
+  title: string;
   description?: string | null;
-  default_author_id?: number | null;
-  images_count: number;
+  is_protected: boolean;  // New in v2.3 - cannot delete if true
+  photo_count: number;
+  created_at: string;
+  updated_at: string;
 }
 
+// PhotoEgg upload response - API v2.3
 interface PhotoEggResponse {
   id: number;
   hothash: string;
-  success: boolean;
-  message: string;
+  user_id: number;
+  width: number;
+  height: number;
+  taken_at?: string | null;
+  gps_latitude?: number | null;
+  gps_longitude?: number | null;
+  rating: number;
+  category?: string | null;
+  visibility: string;
+  created_at: string;
+  updated_at: string;
 }
 
 let selectedFiles: string[] = [];
@@ -243,6 +257,7 @@ async function startImport() {
       html += `<p><strong>Suksess:</strong> ${successCount}</p>`;
       html += `<p><strong>Feil:</strong> ${failCount}</p>`;
       html += `<p><strong>Import Session ID:</strong> ${importSession.id}</p>`;
+      html += `<p><strong>Import Session:</strong> ${importSession.title}</p>`;
       
       if (failCount > 0) {
         html += `<h3>Feil:</h3><ul>`;

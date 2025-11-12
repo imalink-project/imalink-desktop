@@ -44,15 +44,17 @@ pub struct PhotoEgg {
     pub lens_make: Option<String>,
 }
 
-// ImportSession structure - matches imalink backend API
+// ImportSession structure - matches imalink backend API v2.3
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImportSession {
     pub id: i32,
-    pub imported_at: String,
-    pub title: Option<String>,
+    pub user_id: i32,
+    pub title: String,
     pub description: Option<String>,
-    pub default_author_id: Option<i32>,
-    pub images_count: i32,
+    pub is_protected: bool,  // New in v2.3 - cannot delete if true
+    pub photo_count: i32,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 // Structure for creating import session
@@ -63,21 +65,49 @@ pub struct ImportSessionCreate {
     pub default_author_id: Option<i32>,
 }
 
-// Structure for PhotoEgg upload request
+// ImageFile tracking metadata (optional, for desktop app)
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PhotoEggRequest {
-    #[serde(flatten)]
-    pub photoegg: PhotoEgg,
-    pub import_session_id: i32,
+pub struct ImageFileCreate {
+    pub filename: String,
+    pub file_path: String,
+    pub file_size: i64,
+    pub file_format: String,
 }
 
-// Structure for PhotoEgg upload response
+// Structure for PhotoEgg upload request - API v2.3
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PhotoEggRequest {
+    pub photo_egg: PhotoEgg,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub import_session_id: Option<i32>,  // Optional - defaults to protected "Quick Add"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image_file: Option<ImageFileCreate>,  // Optional - for desktop app file tracking
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rating: Option<i32>,  // 0-5 stars
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<String>,  // private|space|authenticated|public
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,  // New in v2.3 - user-defined category
+}
+
+// Structure for PhotoEgg upload response - API v2.3
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PhotoEggResponse {
     pub id: i32,
     pub hothash: String,
-    pub success: bool,
-    pub message: String,
+    pub user_id: i32,
+    pub width: i32,
+    pub height: i32,
+    pub taken_at: Option<String>,
+    pub gps_latitude: Option<f64>,
+    pub gps_longitude: Option<f64>,
+    pub rating: i32,
+    pub category: Option<String>,
+    pub visibility: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 
@@ -240,11 +270,20 @@ async fn upload_photoegg(
     import_session_id: i32,
     auth_token: String,
 ) -> Result<PhotoEggResponse, String> {
+    use std::path::Path;
+    
     let client = reqwest::Client::new();
     
+    // Note: We don't have file_path or file_size here since we're working with PhotoEgg
+    // Desktop app could optionally track these if needed
     let request_body = PhotoEggRequest {
-        photoegg: photo_egg,
-        import_session_id,
+        photo_egg,
+        import_session_id: Some(import_session_id),
+        image_file: None,  // Could be populated if we track original file path
+        rating: Some(0),  // Default rating
+        visibility: Some("private".to_string()),  // Default visibility
+        author_id: None,
+        category: None,
     };
     
     let response = client
