@@ -9,7 +9,7 @@ pub struct User {
     pub id: i32,
     pub username: String,
     pub email: String,
-    pub display_name: String,
+    pub display_name: Option<String>,  // Can be null from backend
     pub is_active: bool,
     #[serde(default)]
     pub created_at: Option<String>,
