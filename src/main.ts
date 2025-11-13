@@ -10,6 +10,7 @@ interface User {
   email: string;
   display_name: string | null;  // Can be null from backend
   is_active: boolean;
+  default_author_id?: number | null;  // NEW in v2.3 - points to user's self-author
 }
 
 interface LoginResponse {
@@ -173,13 +174,11 @@ async function startImport() {
   const backendUrlInput = document.querySelector("#backend-url") as HTMLInputElement;
   const titleInput = document.querySelector("#session-title") as HTMLInputElement;
   const descriptionInput = document.querySelector("#session-description") as HTMLTextAreaElement;
-  const authorIdInput = document.querySelector("#author-id") as HTMLInputElement;
 
   const coreApiUrl = coreUrlInput?.value || "http://localhost:8765";
   const backendUrl = backendUrlInput?.value || "http://localhost:8000";
   const title = titleInput?.value || null;
   const description = descriptionInput?.value || null;
-  const authorId = authorIdInput?.value ? parseInt(authorIdInput.value) : null;
 
   if (!authToken) {
     if (statusEl) {
@@ -202,7 +201,7 @@ async function startImport() {
       backendUrl,
       title,
       description,
-      defaultAuthorId: authorId,
+      defaultAuthorId: null,  // Backend will use user.default_author_id automatically
       authToken
     });
 
@@ -235,19 +234,25 @@ async function startImport() {
       }
 
       try {
+        console.log(`Processing file: ${fileName}`);
+        
         // Step 2a: Send to imalink-core to get PhotoEgg
+        console.log(`Calling process_image_file for ${fileName}`);
         const photoEgg: PhotoEgg = await invoke("process_image_file", {
           filePath,
           coreApiUrl
         });
+        console.log(`Got PhotoEgg for ${fileName}:`, photoEgg.hothash);
 
         // Step 2b: Upload PhotoEgg to backend
+        console.log(`Calling upload_photoegg for ${fileName}`);
         const uploadResult: PhotoEggResponse = await invoke("upload_photoegg", {
           backendUrl,
           photoEgg,
           importSessionId: importSession.id,
           authToken
         });
+        console.log(`Upload successful for ${fileName}:`, uploadResult.hothash);
 
         results.push({
           file: fileName,
@@ -255,6 +260,7 @@ async function startImport() {
           hothash: uploadResult.hothash
         });
       } catch (error) {
+        console.error(`Error processing ${fileName}:`, error);
         results.push({
           file: fileName,
           success: false,
