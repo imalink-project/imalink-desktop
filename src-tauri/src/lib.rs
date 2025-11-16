@@ -82,17 +82,15 @@ pub struct PhotoEgg {
     pub lens_make: Option<String>,
 }
 
-// ImportSession structure - matches imalink backend API v2.3
+// ImportSession structure - matches imalink backend API actual response
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ImportSession {
     pub id: i32,
-    pub user_id: i32,
+    pub imported_at: String,
     pub title: String,
     pub description: Option<String>,
-    pub is_protected: bool,  // New in v2.3 - cannot delete if true
-    pub photo_count: i32,
-    pub created_at: String,
-    pub updated_at: String,
+    pub default_author_id: Option<i32>,
+    pub images_count: i32,
 }
 
 // Structure for creating import session
@@ -278,6 +276,12 @@ async fn create_import_session(
     default_author_id: Option<i32>,
     auth_token: String,
 ) -> Result<ImportSession, String> {
+    eprintln!("DEBUG: Creating import session");
+    eprintln!("DEBUG: Backend URL: {}", backend_url);
+    eprintln!("DEBUG: Title: {:?}", title);
+    eprintln!("DEBUG: Description: {:?}", description);
+    eprintln!("DEBUG: Default author ID: {:?}", default_author_id);
+    
     let client = reqwest::Client::new();
     
     let request_body = ImportSessionCreate {
@@ -285,6 +289,8 @@ async fn create_import_session(
         description,
         default_author_id,
     };
+    
+    eprintln!("DEBUG: Sending POST request...");
     
     let response = client
         .post(format!("{}/api/v1/import-sessions/", backend_url))
@@ -295,6 +301,8 @@ async fn create_import_session(
         .await
         .map_err(|e| format!("Failed to send request to backend: {}", e))?;
     
+    eprintln!("DEBUG: Got response with status: {}", response.status());
+    
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
@@ -304,10 +312,15 @@ async fn create_import_session(
         ));
     }
     
-    let import_session: ImportSession = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    // Debug: Log raw response
+    let response_text = response.text().await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+    eprintln!("DEBUG: Import session response body: {}", response_text);
+    
+    let import_session: ImportSession = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
+    
+    eprintln!("DEBUG: Import session created with ID: {}", import_session.id);
     
     Ok(import_session)
 }
