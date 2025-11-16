@@ -67,15 +67,14 @@ interface PhotoEgg {
 }
 
 // ImportSession structure - matches imalink backend API v2.3
+// ImportSession structure - matches actual backend response
 interface ImportSession {
   id: number;
-  user_id: number;
+  imported_at: string;
   title: string;
   description?: string | null;
-  is_protected: boolean;  // New in v2.3 - cannot delete if true
-  photo_count: number;
-  created_at: string;
-  updated_at: string;
+  default_author_id?: number | null;
+  images_count: number;
 }
 
 // PhotoEgg upload response - API v2.3
@@ -176,7 +175,7 @@ async function startImport() {
   const descriptionInput = document.querySelector("#session-description") as HTMLTextAreaElement;
 
   const coreApiUrl = coreUrlInput?.value || "http://localhost:8765";
-  const backendUrl = backendUrlInput?.value || "http://localhost:8000";
+  const backendUrl = backendUrlInput?.value || "https://api.trollfjell.com";
   const title = titleInput?.value || null;
   const description = descriptionInput?.value || null;
 
@@ -191,12 +190,19 @@ async function startImport() {
   startImportBtn.disabled = true;
 
   try {
+    console.log("Starting import process...");
+    console.log("Backend URL:", backendUrl);
+    console.log("Core API URL:", coreApiUrl);
+    console.log("Auth token present:", !!authToken);
+    console.log("Selected files count:", selectedFiles.length);
+    
     // Step 1: Create import session
     if (statusEl) {
       statusEl.textContent = "Oppretter import session...";
       statusEl.className = "loading";
     }
 
+    console.log("Creating import session...");
     const importSession: ImportSession = await invoke("create_import_session", {
       backendUrl,
       title,
@@ -204,6 +210,7 @@ async function startImport() {
       defaultAuthorId: null,  // Backend will use user.default_author_id automatically
       authToken
     });
+    console.log("Import session created:", importSession.id);
 
     if (statusEl) {
       statusEl.textContent = `✓ Import session opprettet (ID: ${importSession.id})`;
@@ -304,11 +311,14 @@ async function startImport() {
     }
 
   } catch (error) {
+    console.error("Import failed with error:", error);
+    console.error("Error type:", typeof error);
+    console.error("Error stringified:", JSON.stringify(error));
+    
     if (statusEl) {
       statusEl.textContent = `Feil: ${error}`;
       statusEl.className = "error";
     }
-    console.error("Import failed:", error);
   } finally {
     startImportBtn.disabled = false;
   }
