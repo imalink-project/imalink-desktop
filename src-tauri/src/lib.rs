@@ -388,7 +388,7 @@ async fn upload_photoegg(
     eprintln!("DEBUG: Sending POST request...");
     
     let response = client
-        .post(format!("{}/api/v1/photos/photoegg/", backend_url))
+        .post(format!("{}/api/v1/photos/create", backend_url))
         .header("Authorization", format!("Bearer {}", auth_token))
         .header("Content-Type", "application/json")
         .json(&request_body)
