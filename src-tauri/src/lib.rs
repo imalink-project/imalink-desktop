@@ -213,24 +213,14 @@ fn greet(name: &str) -> String {
 
 #[tauri::command]
 async fn process_image_file(file_path: String, core_api_url: String) -> Result<PhotoCreateSchema, String> {
-    eprintln!("DEBUG: Starting process_image_file");
-    eprintln!("DEBUG: File path: {}", file_path);
-    eprintln!("DEBUG: Core API URL: {}", core_api_url);
-    
-    // Les bildefilen
     let path = PathBuf::from(&file_path);
     
     if !path.exists() {
-        eprintln!("DEBUG: File not found!");
         return Err(format!("File not found: {}", file_path));
     }
 
-    eprintln!("DEBUG: Reading file...");
-    // Les filinnholdet
     let file_bytes = std::fs::read(&path)
         .map_err(|e| format!("Failed to read file: {}", e))?;
-
-    eprintln!("DEBUG: File size: {} bytes", file_bytes.len());
 
     let file_name = path
         .file_name()
@@ -238,8 +228,6 @@ async fn process_image_file(file_path: String, core_api_url: String) -> Result<P
         .ok_or("Invalid filename")?
         .to_string();
 
-    eprintln!("DEBUG: Sending to imalink-core...");
-    // Send til imalink-core API
     let client = reqwest::Client::new();
     let form = reqwest::multipart::Form::new()
         .part(
@@ -258,8 +246,6 @@ async fn process_image_file(file_path: String, core_api_url: String) -> Result<P
         .await
         .map_err(|e| format!("Failed to send request to core API: {}", e))?;
 
-    eprintln!("DEBUG: Got response from imalink-core with status: {}", response.status());
-
     if !response.status().is_success() {
         return Err(format!(
             "Core API returned error: {}",
@@ -267,13 +253,8 @@ async fn process_image_file(file_path: String, core_api_url: String) -> Result<P
         ));
     }
 
-    // Debug: Log raw response from imalink-core
     let response_text = response.text().await
         .map_err(|e| format!("Failed to read response: {}", e))?;
-    eprintln!("DEBUG: imalink-core response body (first 1000 chars): {}", 
-              if response_text.len() > 1000 { &response_text[..1000] } else { &response_text });
-
-    // Parse respons fra imalink-core
     let photo_create_schema: PhotoCreateSchema = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse PhotoCreateSchema response: {} | Response start: {}", e, 
                             if response_text.len() > 500 { &response_text[..500] } else { &response_text }))?;
@@ -339,12 +320,6 @@ async fn create_input_channel(
     default_author_id: Option<i32>,
     auth_token: String,
 ) -> Result<InputChannel, String> {
-    eprintln!("DEBUG: Creating input channel");
-    eprintln!("DEBUG: Backend URL: {}", backend_url);
-    eprintln!("DEBUG: Title: {:?}", title);
-    eprintln!("DEBUG: Description: {:?}", description);
-    eprintln!("DEBUG: Default author ID: {:?}", default_author_id);
-    
     let client = reqwest::Client::new();
     
     let request_body = InputChannelCreate {
@@ -352,8 +327,6 @@ async fn create_input_channel(
         description,
         default_author_id,
     };
-    
-    eprintln!("DEBUG: Sending POST request...");
     
     let response = client
         .post(format!("{}/api/v1/input-channels/", backend_url))
@@ -364,8 +337,6 @@ async fn create_input_channel(
         .await
         .map_err(|e| format!("Failed to send request to backend: {}", e))?;
     
-    eprintln!("DEBUG: Got response with status: {}", response.status());
-    
     if !response.status().is_success() {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
@@ -375,15 +346,11 @@ async fn create_input_channel(
         ));
     }
     
-    // Debug: Log raw response
     let response_text = response.text().await
         .map_err(|e| format!("Failed to read response: {}", e))?;
-    eprintln!("DEBUG: Input channel response body: {}", response_text);
     
     let input_channel: InputChannel = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
-    
-    eprintln!("DEBUG: Input channel created with ID: {}", input_channel.id);
     
     Ok(input_channel)
 }
@@ -395,10 +362,6 @@ async fn upload_photo_create_schema(
     input_channel_id: i32,
     auth_token: String,
 ) -> Result<PhotoCreateResponse, String> {
-    eprintln!("DEBUG: Starting upload_photo_create_schema");
-    eprintln!("DEBUG: Backend URL: {}", backend_url);
-    eprintln!("DEBUG: Input channel ID: {}", input_channel_id);
-    
     let client = reqwest::Client::new();
     
     // Note: We don't have file_path or file_size here since we're working with PhotoCreateSchema
@@ -413,8 +376,6 @@ async fn upload_photo_create_schema(
         category: None,
     };
     
-    eprintln!("DEBUG: Sending POST request...");
-    
     let response = client
         .post(format!("{}/api/v1/photos/create", backend_url))
         .header("Authorization", format!("Bearer {}", auth_token))
@@ -423,8 +384,6 @@ async fn upload_photo_create_schema(
         .send()
         .await
         .map_err(|e| format!("Failed to send request to backend: {}", e))?;
-    
-    eprintln!("DEBUG: Got response with status: {}", response.status());
     
     if !response.status().is_success() {
         let status = response.status();
@@ -435,10 +394,8 @@ async fn upload_photo_create_schema(
         ));
     }
     
-    // Debug: Log raw response
     let response_text = response.text().await
         .map_err(|e| format!("Failed to read response: {}", e))?;
-    eprintln!("DEBUG: PhotoCreateSchema upload response body: {}", response_text);
     
     let photo_response: PhotoCreateResponse = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
