@@ -25,9 +25,10 @@ let authToken: string | null = null;
 let currentUser: User | null = null;
 let credentialsStore: Store | null = null;
 
-// PhotoEgg structure - matches imalink-core v2.0 API response
-interface PhotoEgg {
-  // Identity
+// PhotoCreateSchema structure - matches imalink-core v2.x API response
+// CRITICAL: This is the canonical format from imalink-core (not PhotoEgg)
+interface PhotoCreateSchema {
+  // Identity (required)
   hothash: string;
   
   // Hotpreview (always present)
@@ -40,30 +41,29 @@ interface PhotoEgg {
   coldpreview_width?: number | null;
   coldpreview_height?: number | null;
   
-  // File info
-  primary_filename: string;
+  // File info (required)
   width: number;
   height: number;
   
-  // Timestamps
+  // Timestamps (optional)
   taken_at?: string | null;
   
-  // Camera metadata
-  camera_make?: string | null;
-  camera_model?: string | null;
-  
-  // GPS
+  // GPS (optional)
   gps_latitude?: number | null;
   gps_longitude?: number | null;
-  has_gps: boolean;
   
-  // Camera settings
-  iso?: number | null;
-  aperture?: number | null;
-  shutter_speed?: string | null;
-  focal_length?: number | null;
-  lens_model?: string | null;
-  lens_make?: string | null;
+  // NEW in v2.x: Complete EXIF metadata in flexible JSON object
+  exif_dict?: Record<string, any>;
+  
+  // NEW in v2.x: List of source image files
+  image_file_list?: ImageFileSchema[];
+}
+
+interface ImageFileSchema {
+  filename: string;
+  file_size?: number;
+  format?: string | null;
+  is_raw?: boolean;
 }
 
 // InputChannel structure - matches imalink backend API v2.4
@@ -71,14 +71,14 @@ interface PhotoEgg {
 interface InputChannel {
   id: number;
   imported_at: string;
-  title: string;
+  title?: string | null;  // Can be null from backend
   description?: string | null;
   default_author_id?: number | null;
   images_count: number;
 }
 
-// PhotoEgg upload response - API v2.3
-interface PhotoEggResponse {
+// PhotoCreateSchema upload response - API v2.4
+interface PhotoCreateResponse {
   id: number;
   hothash: string;
   user_id: number;
@@ -243,19 +243,19 @@ async function startImport() {
       try {
         console.log(`Processing file: ${fileName}`);
         
-        // Step 2a: Send to imalink-core to get PhotoEgg
+        // Step 2a: Send to imalink-core to get PhotoCreateSchema
         console.log(`Calling process_image_file for ${fileName}`);
-        const photoEgg: PhotoEgg = await invoke("process_image_file", {
+        const photoCreateSchema: PhotoCreateSchema = await invoke("process_image_file", {
           filePath,
           coreApiUrl
         });
-        console.log(`Got PhotoEgg for ${fileName}:`, photoEgg.hothash);
+        console.log(`Got PhotoCreateSchema for ${fileName}:`, photoCreateSchema.hothash);
 
-        // Step 2b: Upload PhotoEgg to backend
+        // Step 2b: Upload PhotoCreateSchema to backend
         console.log(`Calling upload_photoegg for ${fileName}`);
-        const uploadResult: PhotoEggResponse = await invoke("upload_photoegg", {
+        const uploadResult: PhotoCreateResponse = await invoke("upload_photoegg", {
           backendUrl,
-          photoEgg,
+          photoCreateSchema,
           inputChannelId: inputChannel.id,
           authToken
         });

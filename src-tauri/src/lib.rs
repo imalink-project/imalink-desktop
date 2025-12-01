@@ -40,10 +40,13 @@ pub struct RegisterRequest {
     pub display_name: String,
 }
 
-// PhotoEgg structure - matches imalink-core API response
+// PhotoCreateSchema structure - matches imalink-core v2.x API response
+// See: https://github.com/kjelkols/imalink-core/blob/main/service/main.py
+// CRITICAL: This is the canonical format from imalink-core (not PhotoEgg)
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PhotoEgg {
-    // Identity
+#[serde(default)]  // Allow missing optional fields
+pub struct PhotoCreateSchema {
+    // Identity (required)
     pub hothash: String,
     
     // Hotpreview (always present)
@@ -56,30 +59,57 @@ pub struct PhotoEgg {
     pub coldpreview_width: Option<i32>,
     pub coldpreview_height: Option<i32>,
     
-    // File info
-    pub primary_filename: String,
+    // File info (required)
     pub width: i32,
     pub height: i32,
     
-    // Timestamps
+    // Timestamps (optional)
     pub taken_at: Option<String>,
     
-    // Camera metadata
-    pub camera_make: Option<String>,
-    pub camera_model: Option<String>,
-    
-    // GPS
+    // GPS (optional)
     pub gps_latitude: Option<f64>,
     pub gps_longitude: Option<f64>,
-    pub has_gps: bool,
     
-    // Camera settings
-    pub iso: Option<i32>,
-    pub aperture: Option<f64>,
-    pub shutter_speed: Option<String>,
-    pub focal_length: Option<f64>,
-    pub lens_model: Option<String>,
-    pub lens_make: Option<String>,
+    // NEW in v2.x: Complete EXIF metadata in flexible JSON object
+    #[serde(default)]
+    pub exif_dict: serde_json::Value,  // JSON object with all EXIF data
+    
+    // NEW in v2.x: List of source image files
+    #[serde(default)]
+    pub image_file_list: Vec<ImageFileSchema>,
+}
+
+// ImageFile schema from imalink-core response
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct ImageFileSchema {
+    pub filename: String,
+    #[serde(default)]
+    pub file_size: i64,
+    #[serde(default)]
+    pub format: Option<String>,
+    #[serde(default)]
+    pub is_raw: bool,
+}
+
+impl Default for PhotoCreateSchema {
+    fn default() -> Self {
+        PhotoCreateSchema {
+            hothash: String::new(),
+            hotpreview_base64: String::new(),
+            hotpreview_width: 0,
+            hotpreview_height: 0,
+            coldpreview_base64: None,
+            coldpreview_width: None,
+            coldpreview_height: None,
+            width: 0,
+            height: 0,
+            taken_at: None,
+            gps_latitude: None,
+            gps_longitude: None,
+            exif_dict: serde_json::Value::Object(serde_json::Map::new()),
+            image_file_list: Vec::new(),
+        }
+    }
 }
 
 // InputChannel structure - matches imalink backend API actual response
@@ -87,7 +117,7 @@ pub struct PhotoEgg {
 pub struct InputChannel {
     pub id: i32,
     pub imported_at: String,
-    pub title: String,
+    pub title: Option<String>,  // Can be null from backend
     pub description: Option<String>,
     pub default_author_id: Option<i32>,
     pub images_count: i32,
@@ -110,10 +140,10 @@ pub struct ImageFileCreate {
     pub file_format: String,
 }
 
-// Structure for PhotoEgg upload request - API v2.4
+// Structure for PhotoCreateSchema upload request - API v2.4
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PhotoEggRequest {
-    pub photo_egg: PhotoEgg,
+pub struct PhotoCreateRequest {
+    pub photo_create_schema: PhotoCreateSchema,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub input_channel_id: Option<i32>,  // Optional - defaults to protected "Quick Channel"
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -128,9 +158,9 @@ pub struct PhotoEggRequest {
     pub category: Option<String>,  // New in v2.3 - user-defined category
 }
 
-// Structure for PhotoEgg upload response - API v2.3
+// Structure for PhotoCreateSchema upload response - API v2.4
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PhotoEggResponse {
+pub struct PhotoCreateResponse {
     pub id: i32,
     pub hothash: String,
     pub user_id: i32,
@@ -154,7 +184,7 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-async fn process_image_file(file_path: String, core_api_url: String) -> Result<PhotoEgg, String> {
+async fn process_image_file(file_path: String, core_api_url: String) -> Result<PhotoCreateSchema, String> {
     eprintln!("DEBUG: Starting process_image_file");
     eprintln!("DEBUG: File path: {}", file_path);
     eprintln!("DEBUG: Core API URL: {}", core_api_url);
@@ -209,13 +239,18 @@ async fn process_image_file(file_path: String, core_api_url: String) -> Result<P
         ));
     }
 
-    // Parse respons fra imalink-core
-    let photo_egg: PhotoEgg = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {}", e))?;
+    // Debug: Log raw response from imalink-core
+    let response_text = response.text().await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+    eprintln!("DEBUG: imalink-core response body (first 1000 chars): {}", 
+              if response_text.len() > 1000 { &response_text[..1000] } else { &response_text });
 
-    Ok(photo_egg)
+    // Parse respons fra imalink-core
+    let photo_create_schema: PhotoCreateSchema = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse PhotoCreateSchema response: {} | Response start: {}", e, 
+                            if response_text.len() > 500 { &response_text[..500] } else { &response_text }))?;
+
+    Ok(photo_create_schema)
 }
 
 #[tauri::command]
@@ -328,10 +363,10 @@ async fn create_input_channel(
 #[tauri::command]
 async fn upload_photoegg(
     backend_url: String,
-    photo_egg: PhotoEgg,
+    photo_create_schema: PhotoCreateSchema,
     input_channel_id: i32,
     auth_token: String,
-) -> Result<PhotoEggResponse, String> {
+) -> Result<PhotoCreateResponse, String> {
     eprintln!("DEBUG: Starting upload_photoegg");
     eprintln!("DEBUG: Backend URL: {}", backend_url);
     eprintln!("DEBUG: Input channel ID: {}", input_channel_id);
@@ -340,8 +375,8 @@ async fn upload_photoegg(
     
     // Note: We don't have file_path or file_size here since we're working with PhotoEgg
     // Desktop app could optionally track these if needed
-    let request_body = PhotoEggRequest {
-        photo_egg,
+    let request_body = PhotoCreateRequest {
+        photo_create_schema,
         input_channel_id: Some(input_channel_id),
         image_file: None,  // Could be populated if we track original file path
         rating: Some(0),  // Default rating
@@ -377,7 +412,7 @@ async fn upload_photoegg(
         .map_err(|e| format!("Failed to read response: {}", e))?;
     eprintln!("DEBUG: PhotoEgg upload response body: {}", response_text);
     
-    let photoegg_response: PhotoEggResponse = serde_json::from_str(&response_text)
+    let photoegg_response: PhotoCreateResponse = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
     
     Ok(photoegg_response)
