@@ -66,9 +66,9 @@ interface PhotoEgg {
   lens_make?: string | null;
 }
 
-// ImportSession structure - matches imalink backend API v2.3
-// ImportSession structure - matches actual backend response
-interface ImportSession {
+// InputChannel structure - matches imalink backend API v2.4
+// InputChannel structure - matches actual backend response
+interface InputChannel {
   id: number;
   imported_at: string;
   title: string;
@@ -202,18 +202,18 @@ async function startImport() {
       statusEl.className = "loading";
     }
 
-    console.log("Creating import session...");
-    const importSession: ImportSession = await invoke("create_import_session", {
+    console.log("Creating input channel...");
+    const inputChannel: InputChannel = await invoke("create_input_channel", {
       backendUrl,
       title,
       description,
       defaultAuthorId: null,  // Backend will use user.default_author_id automatically
       authToken
     });
-    console.log("Import session created:", importSession.id);
+    console.log("Input channel created:", inputChannel.id);
 
     if (statusEl) {
-      statusEl.textContent = `✓ Import session opprettet (ID: ${importSession.id})`;
+      statusEl.textContent = `✓ Input channel opprettet (ID: ${inputChannel.id})`;
       statusEl.className = "success";
     }
 
@@ -256,7 +256,7 @@ async function startImport() {
         const uploadResult: PhotoEggResponse = await invoke("upload_photoegg", {
           backendUrl,
           photoEgg,
-          importSessionId: importSession.id,
+          inputChannelId: inputChannel.id,
           authToken
         });
         console.log(`Upload successful for ${fileName}:`, uploadResult.hothash);
@@ -290,8 +290,8 @@ async function startImport() {
       html += `<p><strong>Total:</strong> ${selectedFiles.length} filer</p>`;
       html += `<p><strong>Suksess:</strong> ${successCount}</p>`;
       html += `<p><strong>Feil:</strong> ${failCount}</p>`;
-      html += `<p><strong>Import Session ID:</strong> ${importSession.id}</p>`;
-      html += `<p><strong>Import Session:</strong> ${importSession.title}</p>`;
+      html += `<p><strong>Input Channel ID:</strong> ${inputChannel.id}</p>`;
+      html += `<p><strong>Input Channel:</strong> ${inputChannel.title}</p>`;
       
       if (failCount > 0) {
         html += `<h3>Feil:</h3><ul>`;

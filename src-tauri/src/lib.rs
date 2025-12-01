@@ -82,9 +82,9 @@ pub struct PhotoEgg {
     pub lens_make: Option<String>,
 }
 
-// ImportSession structure - matches imalink backend API actual response
+// InputChannel structure - matches imalink backend API actual response
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ImportSession {
+pub struct InputChannel {
     pub id: i32,
     pub imported_at: String,
     pub title: String,
@@ -93,9 +93,9 @@ pub struct ImportSession {
     pub images_count: i32,
 }
 
-// Structure for creating import session
+// Structure for creating input channel
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ImportSessionCreate {
+pub struct InputChannelCreate {
     pub title: Option<String>,
     pub description: Option<String>,
     pub default_author_id: Option<i32>,
@@ -110,12 +110,12 @@ pub struct ImageFileCreate {
     pub file_format: String,
 }
 
-// Structure for PhotoEgg upload request - API v2.3
+// Structure for PhotoEgg upload request - API v2.4
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PhotoEggRequest {
     pub photo_egg: PhotoEgg,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub import_session_id: Option<i32>,  // Optional - defaults to protected "Quick Add"
+    pub input_channel_id: Option<i32>,  // Optional - defaults to protected "Quick Channel"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_file: Option<ImageFileCreate>,  // Optional - for desktop app file tracking
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -269,14 +269,14 @@ fn scan_directory(dir_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-async fn create_import_session(
+async fn create_input_channel(
     backend_url: String,
     title: Option<String>,
     description: Option<String>,
     default_author_id: Option<i32>,
     auth_token: String,
-) -> Result<ImportSession, String> {
-    eprintln!("DEBUG: Creating import session");
+) -> Result<InputChannel, String> {
+    eprintln!("DEBUG: Creating input channel");
     eprintln!("DEBUG: Backend URL: {}", backend_url);
     eprintln!("DEBUG: Title: {:?}", title);
     eprintln!("DEBUG: Description: {:?}", description);
@@ -284,7 +284,7 @@ async fn create_import_session(
     
     let client = reqwest::Client::new();
     
-    let request_body = ImportSessionCreate {
+    let request_body = InputChannelCreate {
         title,
         description,
         default_author_id,
@@ -293,7 +293,7 @@ async fn create_import_session(
     eprintln!("DEBUG: Sending POST request...");
     
     let response = client
-        .post(format!("{}/api/v1/import-sessions/", backend_url))
+        .post(format!("{}/api/v1/input-channels/", backend_url))
         .header("Authorization", format!("Bearer {}", auth_token))
         .header("Content-Type", "application/json")
         .json(&request_body)
@@ -315,26 +315,26 @@ async fn create_import_session(
     // Debug: Log raw response
     let response_text = response.text().await
         .map_err(|e| format!("Failed to read response: {}", e))?;
-    eprintln!("DEBUG: Import session response body: {}", response_text);
+    eprintln!("DEBUG: Input channel response body: {}", response_text);
     
-    let import_session: ImportSession = serde_json::from_str(&response_text)
+    let input_channel: InputChannel = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
     
-    eprintln!("DEBUG: Import session created with ID: {}", import_session.id);
+    eprintln!("DEBUG: Input channel created with ID: {}", input_channel.id);
     
-    Ok(import_session)
+    Ok(input_channel)
 }
 
 #[tauri::command]
 async fn upload_photoegg(
     backend_url: String,
     photo_egg: PhotoEgg,
-    import_session_id: i32,
+    input_channel_id: i32,
     auth_token: String,
 ) -> Result<PhotoEggResponse, String> {
     eprintln!("DEBUG: Starting upload_photoegg");
     eprintln!("DEBUG: Backend URL: {}", backend_url);
-    eprintln!("DEBUG: Import session ID: {}", import_session_id);
+    eprintln!("DEBUG: Input channel ID: {}", input_channel_id);
     
     let client = reqwest::Client::new();
     
@@ -342,7 +342,7 @@ async fn upload_photoegg(
     // Desktop app could optionally track these if needed
     let request_body = PhotoEggRequest {
         photo_egg,
-        import_session_id: Some(import_session_id),
+        input_channel_id: Some(input_channel_id),
         image_file: None,  // Could be populated if we track original file path
         rating: Some(0),  // Default rating
         visibility: Some("private".to_string()),  // Default visibility
@@ -531,7 +531,7 @@ pub fn run() {
             greet, 
             process_image_file, 
             scan_directory,
-            create_import_session,
+            create_input_channel,
             upload_photoegg,
             login,
             register,
