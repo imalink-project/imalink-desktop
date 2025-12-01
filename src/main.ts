@@ -91,7 +91,8 @@ interface PhotoCreateResponse {
   category?: string | null;
   visibility: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string | null;  // Optional - backend may not return it
+  is_duplicate?: boolean;  // NEW in API v2.4 - indicates if photo already existed
 }
 
 let selectedFiles: string[] = [];

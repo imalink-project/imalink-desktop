@@ -160,6 +160,7 @@ pub struct PhotoCreateRequest {
 
 // Structure for PhotoCreateSchema upload response - API v2.4
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PhotoCreateResponse {
     pub id: i32,
     pub hothash: String,
@@ -167,13 +168,40 @@ pub struct PhotoCreateResponse {
     pub width: i32,
     pub height: i32,
     pub taken_at: Option<String>,
+    #[serde(default)]
     pub gps_latitude: Option<f64>,
+    #[serde(default)]
     pub gps_longitude: Option<f64>,
     pub rating: i32,
+    #[serde(default)]
     pub category: Option<String>,
     pub visibility: String,
     pub created_at: String,
-    pub updated_at: String,
+    #[serde(default)]
+    pub updated_at: Option<String>,  // Optional - backend may not return it
+    #[serde(default)]
+    pub is_duplicate: bool,  // NEW in API v2.4 - indicates if photo already existed
+}
+
+impl Default for PhotoCreateResponse {
+    fn default() -> Self {
+        PhotoCreateResponse {
+            id: 0,
+            hothash: String::new(),
+            user_id: 0,
+            width: 0,
+            height: 0,
+            taken_at: None,
+            gps_latitude: None,
+            gps_longitude: None,
+            rating: 0,
+            category: None,
+            visibility: "private".to_string(),
+            created_at: String::new(),
+            updated_at: None,
+            is_duplicate: false,
+        }
+    }
 }
 
 
