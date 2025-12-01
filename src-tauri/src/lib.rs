@@ -42,7 +42,7 @@ pub struct RegisterRequest {
 
 // PhotoCreateSchema structure - matches imalink-core v2.x API response
 // See: https://github.com/kjelkols/imalink-core/blob/main/service/main.py
-// CRITICAL: This is the canonical format from imalink-core (not PhotoEgg)
+// This is the canonical format from imalink-core API v2.x+ (replaces legacy PhotoEgg)
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]  // Allow missing optional fields
 pub struct PhotoCreateSchema {
@@ -361,19 +361,19 @@ async fn create_input_channel(
 }
 
 #[tauri::command]
-async fn upload_photoegg(
+async fn upload_photo_create_schema(
     backend_url: String,
     photo_create_schema: PhotoCreateSchema,
     input_channel_id: i32,
     auth_token: String,
 ) -> Result<PhotoCreateResponse, String> {
-    eprintln!("DEBUG: Starting upload_photoegg");
+    eprintln!("DEBUG: Starting upload_photo_create_schema");
     eprintln!("DEBUG: Backend URL: {}", backend_url);
     eprintln!("DEBUG: Input channel ID: {}", input_channel_id);
     
     let client = reqwest::Client::new();
     
-    // Note: We don't have file_path or file_size here since we're working with PhotoEgg
+    // Note: We don't have file_path or file_size here since we're working with PhotoCreateSchema
     // Desktop app could optionally track these if needed
     let request_body = PhotoCreateRequest {
         photo_create_schema,
@@ -410,12 +410,12 @@ async fn upload_photoegg(
     // Debug: Log raw response
     let response_text = response.text().await
         .map_err(|e| format!("Failed to read response: {}", e))?;
-    eprintln!("DEBUG: PhotoEgg upload response body: {}", response_text);
+    eprintln!("DEBUG: PhotoCreateSchema upload response body: {}", response_text);
     
-    let photoegg_response: PhotoCreateResponse = serde_json::from_str(&response_text)
+    let photo_response: PhotoCreateResponse = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
     
-    Ok(photoegg_response)
+    Ok(photo_response)
 }
 
 // ===== Authentication Commands =====
@@ -567,7 +567,7 @@ pub fn run() {
             process_image_file, 
             scan_directory,
             create_input_channel,
-            upload_photoegg,
+            upload_photo_create_schema,
             login,
             register,
             logout,

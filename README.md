@@ -9,7 +9,7 @@ Desktop companion application for Imalink, providing local file system access an
 This POC demonstrates:
 - Local file selection using native OS dialogs
 - Communication with imalink-core API for metadata extraction
-- Display of PhotoEgg data (EXIF, previews, GPS, camera settings)
+- Display of PhotoCreateSchema data (EXIF, previews, GPS, camera settings)
 - Tauri v2 + TypeScript architecture
 
 ## Status
@@ -17,16 +17,15 @@ This POC demonstrates:
 **Experimental** - Basic functionality working:
 - ✅ File selection via GTK dialog
 - ✅ Send images to imalink-core (`/v1/process`)
-- ✅ Receive and display PhotoEgg JSON
+- ✅ Receive and display PhotoCreateSchema JSON
 - ✅ Show hotpreview (150x150 thumbnail)
 - ✅ Show coldpreview (1200px max)
 - ✅ Display full EXIF metadata
 
 **Not implemented:**
-- Upload PhotoEgg to imalink backend
-- Batch processing
-- Local PhotoEgg storage
-- Production build/distribution
+- Batch processing multiple folders
+- Local metadata caching
+- Production build optimization/distribution
 
 ## Quick Start
 
@@ -56,7 +55,7 @@ Desktop app (Tauri)
     ↓
 imalink-core API (localhost:8765/v1/process)
     ↓
-PhotoEgg JSON response
+PhotoCreateSchema JSON response
     ↓
 Display metadata + previews
 ```

@@ -26,7 +26,7 @@ let currentUser: User | null = null;
 let credentialsStore: Store | null = null;
 
 // PhotoCreateSchema structure - matches imalink-core v2.x API response
-// CRITICAL: This is the canonical format from imalink-core (not PhotoEgg)
+// This is the canonical format from imalink-core API v2.x+
 interface PhotoCreateSchema {
   // Identity (required)
   hothash: string;
@@ -252,8 +252,8 @@ async function startImport() {
         console.log(`Got PhotoCreateSchema for ${fileName}:`, photoCreateSchema.hothash);
 
         // Step 2b: Upload PhotoCreateSchema to backend
-        console.log(`Calling upload_photoegg for ${fileName}`);
-        const uploadResult: PhotoCreateResponse = await invoke("upload_photoegg", {
+        console.log(`Calling upload_photo_create_schema for ${fileName}`);
+        const uploadResult: PhotoCreateResponse = await invoke("upload_photo_create_schema", {
           backendUrl,
           photoCreateSchema,
           inputChannelId: inputChannel.id,

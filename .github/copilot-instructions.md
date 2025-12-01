@@ -13,13 +13,13 @@ Desktop companion application for Imalink, providing local file system access an
 This is a **proof-of-concept** to validate:
 - Tauri v2 as desktop framework for Imalink
 - Integration with imalink-core local API
-- PhotoEgg workflow (file → core → metadata → display)
+- PhotoCreateSchema workflow (file → core → metadata → display)
 - Native file dialogs on Linux/WSL
 
 **Working features:**
 - File selection via native OS dialog
 - Send image to imalink-core API
-- Receive PhotoEgg JSON response
+- Receive PhotoCreateSchema JSON response
 - Display metadata (EXIF, GPS, camera settings)
 - Show hotpreview (150x150) and coldpreview (1200px)
 
@@ -29,12 +29,12 @@ This is a **proof-of-concept** to validate:
 - Local storage
 - Production build
 
-## Planned Architecture
+## Architecture
 
 **Technology Stack:**
 - **Tauri v2** - Desktop application framework (Rust backend + web frontend)
 - **TypeScript** - Frontend language with Vite bundler
-- **Vanilla TS** - No frontend framework (can be changed later)
+- **Vanilla TS** - No frontend framework
 
 **Directory Structure:**
 - `src/` - TypeScript frontend
@@ -54,15 +54,15 @@ This is a **proof-of-concept** to validate:
 **Core Responsibilities:**
 - Local file system access for image files
 - Send image files to `imalink-core` API (local) for metadata extraction
-- Receive PhotoEgg objects (EXIF, preview, etc.) from imalink-core
-- Upload PhotoEgg metadata to Imalink backend API
+- Receive PhotoCreateSchema objects (EXIF, preview, etc.) from imalink-core
+- Upload PhotoCreateSchema metadata to Imalink backend API
 - Organize and manage local image file collections
 
 **Architecture Flow:**
 1. Desktop app scans/selects local image files
 2. Sends files to `imalink-core` (local API server)
-3. Receives `PhotoEgg` metadata response
-4. Forwards PhotoEgg to Imalink backend API
+3. Receives `PhotoCreateSchema` metadata response
+4. Forwards PhotoCreateSchema to Imalink backend API
 
 **Relationship to Other Components:**
 - `imalink` ([github.com/kjelkols/imalink](https://github.com/kjelkols/imalink)) - Backend API server
@@ -93,7 +93,7 @@ npm run tauri [cmd] # Run Tauri CLI commands
 When the project structure is established, this file will be updated with:
 - Tauri project structure and setup commands
 - API communication patterns (imalink-core and backend)
-- PhotoEgg data structure and handling
+- PhotoCreateSchema data structure and handling
 - File system scanning and organization workflows
 - Development and build commands
 - Project-specific conventions and patterns
