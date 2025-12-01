@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 // ===== Authentication Structures =====
 
@@ -556,8 +557,33 @@ pub fn run() {
             login,
             register,
             logout,
-            validate_token
+            validate_token,
+            open_web_gallery
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// ===== Web Gallery Integration =====
+
+#[tauri::command]
+async fn open_web_gallery(app: tauri::AppHandle, token: Option<String>) -> Result<(), String> {
+    let gallery_url = if let Some(auth_token) = token {
+        // Pass token as URL fragment (client-side only, not sent to server)
+        format!("https://imalink.trollfjell.com/#token={}", auth_token)
+    } else {
+        "https://imalink.trollfjell.com".to_string()
+    };
+
+    WebviewWindowBuilder::new(
+        &app,
+        "gallery",
+        WebviewUrl::External(gallery_url.parse().map_err(|e| format!("Invalid URL: {}", e))?)
+    )
+    .title("Imalink Gallery")
+    .inner_size(1200.0, 800.0)
+    .build()
+    .map_err(|e| format!("Failed to create gallery window: {}", e))?;
+
+    Ok(())
 }
