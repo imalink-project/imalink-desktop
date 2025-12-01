@@ -193,6 +193,17 @@ button:disabled {
   color: #333;
 }
 
+.gallery-btn {
+  background: #28a745;
+  padding: 8px 16px;
+  font-size: 13px;
+  margin-right: 10px;
+}
+
+.gallery-btn:hover {
+  background: #218838;
+}
+
 .logout-btn {
   background: #dc3545;
   padding: 8px 16px;

@@ -540,6 +540,17 @@ function showMainScreen() {
   }
 }
 
+async function openWebGallery() {
+  try {
+    await invoke("open_web_gallery", {
+      token: authToken
+    });
+  } catch (error) {
+    console.error("Failed to open gallery:", error);
+    alert(`Kunne ikke åpne galleri: ${error}`);
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   // Initialize authentication
   initializeAuth();
@@ -547,10 +558,12 @@ window.addEventListener("DOMContentLoaded", () => {
   // Main screen event listeners
   const selectDirBtn = document.querySelector("#select-dir");
   const startImportBtn = document.querySelector("#start-import");
+  const openGalleryBtn = document.querySelector("#open-gallery-btn");
   const logoutBtn = document.querySelector("#logout-btn");
   
   selectDirBtn?.addEventListener("click", selectDirectory);
   startImportBtn?.addEventListener("click", startImport);
+  openGalleryBtn?.addEventListener("click", openWebGallery);
   logoutBtn?.addEventListener("click", handleLogout);
   
   // Login screen event listeners
