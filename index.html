@@ -135,22 +135,42 @@
         </div>
 
         <div class="section">
-          <h2>2. Input Channel Metadata</h2>
+          <h2>2. Input Channel</h2>
           <div class="controls">
-            <label for="session-title">Tittel (valgfritt):</label>
-            <input 
-              type="text" 
-              id="session-title" 
-              placeholder="Eksempel: Italia Sommer 2024"
-            />
-          </div>
-          <div class="controls">
-            <label for="session-description">Beskrivelse (valgfritt):</label>
-            <textarea 
-              id="session-description" 
-              rows="3"
-              placeholder="Beskrivelse av importen..."
-            ></textarea>
+            <label>Velg eksisterende eller opprett ny:</label>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+              <button id="load-channels-btn" type="button">Last inn kanaler</button>
+              <button id="show-create-channel-btn" type="button">+ Ny kanal</button>
+            </div>
+            
+            <div id="channel-selector" style="display: none;">
+              <label for="existing-channels">Velg eksisterende kanal:</label>
+              <select id="existing-channels" size="5" style="width: 100%; padding: 8px;">
+                <option value="">-- Velg kanal --</option>
+              </select>
+            </div>
+
+            <div id="create-channel-form" style="display: none; margin-top: 15px;">
+              <h3 style="margin-top: 0;">Opprett ny kanal</h3>
+              <label for="session-title">Tittel (påkrevd):</label>
+              <input 
+                type="text" 
+                id="session-title" 
+                placeholder="Eksempel: Italia Sommer 2024"
+                required
+              />
+              <label for="session-description" style="margin-top: 10px;">Beskrivelse (valgfritt):</label>
+              <textarea 
+                id="session-description" 
+                rows="3"
+                placeholder="Beskrivelse av importen..."
+              ></textarea>
+              <button id="create-channel-btn" type="button" style="margin-top: 10px;">Opprett kanal</button>
+            </div>
+
+            <div id="selected-channel-info" style="margin-top: 15px; padding: 10px; background: #f0f0f0; border-radius: 4px; display: none;">
+              <strong>Valgt kanal:</strong> <span id="selected-channel-name"></span>
+            </div>
           </div>
           <p class="info-text">📸 Bildene vil automatisk knyttes til deg som fotograf</p>
         </div>

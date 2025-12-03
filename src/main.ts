@@ -97,6 +97,7 @@ interface PhotoCreateResponse {
 
 let selectedFiles: string[] = [];
 let selectedDirPath: string | null = null;
+let selectedInputChannelId: number | null = null;
 
 async function selectDirectory() {
   const statusEl = document.querySelector("#status");
@@ -172,17 +173,21 @@ async function startImport() {
   // Get configuration
   const coreUrlInput = document.querySelector("#core-url") as HTMLInputElement;
   const backendUrlInput = document.querySelector("#backend-url") as HTMLInputElement;
-  const titleInput = document.querySelector("#session-title") as HTMLInputElement;
-  const descriptionInput = document.querySelector("#session-description") as HTMLTextAreaElement;
 
   const coreApiUrl = coreUrlInput?.value || "http://localhost:8765";
   const backendUrl = backendUrlInput?.value || "https://api.trollfjell.com";
-  const title = titleInput?.value || null;
-  const description = descriptionInput?.value || null;
 
   if (!authToken) {
     if (statusEl) {
       statusEl.textContent = "Feil: Du må være innlogget";
+      statusEl.className = "error";
+    }
+    return;
+  }
+
+  if (!selectedInputChannelId) {
+    if (statusEl) {
+      statusEl.textContent = "Feil: Du må velge eller opprette en input channel";
       statusEl.className = "error";
     }
     return;
@@ -196,27 +201,14 @@ async function startImport() {
     console.log("Core API URL:", coreApiUrl);
     console.log("Auth token present:", !!authToken);
     console.log("Selected files count:", selectedFiles.length);
+    console.log("Input channel ID:", selectedInputChannelId);
     
-    // Step 1: Create import session
     if (statusEl) {
-      statusEl.textContent = "Oppretter import session...";
-      statusEl.className = "loading";
-    }
-
-    console.log("Creating input channel...");
-    const inputChannel: InputChannel = await invoke("create_input_channel", {
-      backendUrl,
-      title,
-      description,
-      defaultAuthorId: null,  // Backend will use user.default_author_id automatically
-      authToken
-    });
-    console.log("Input channel created:", inputChannel.id);
-
-    if (statusEl) {
-      statusEl.textContent = `✓ Input channel opprettet (ID: ${inputChannel.id})`;
+      statusEl.textContent = `Bruker input channel ID: ${selectedInputChannelId}`;
       statusEl.className = "success";
     }
+
+    const inputChannelId = selectedInputChannelId;
 
     // Step 2: Process each file
     if (progressEl) {
@@ -257,7 +249,7 @@ async function startImport() {
         const uploadResult: PhotoCreateResponse = await invoke("upload_photo_create_schema", {
           backendUrl,
           photoCreateSchema,
-          inputChannelId: inputChannel.id,
+          inputChannelId,
           authToken
         });
         console.log(`Upload successful for ${fileName}:`, uploadResult.hothash);
@@ -291,8 +283,7 @@ async function startImport() {
       html += `<p><strong>Total:</strong> ${selectedFiles.length} filer</p>`;
       html += `<p><strong>Suksess:</strong> ${successCount}</p>`;
       html += `<p><strong>Feil:</strong> ${failCount}</p>`;
-      html += `<p><strong>Input Channel ID:</strong> ${inputChannel.id}</p>`;
-      html += `<p><strong>Input Channel:</strong> ${inputChannel.title}</p>`;
+      html += `<p><strong>Input Channel ID:</strong> ${inputChannelId}</p>`;
       
       if (failCount > 0) {
         html += `<h3>Feil:</h3><ul>`;
@@ -551,6 +542,129 @@ async function openWebGallery() {
   }
 }
 
+async function loadInputChannels() {
+  const backendUrlInput = document.querySelector("#backend-url") as HTMLInputElement;
+  const backendUrl = backendUrlInput?.value || "https://api.trollfjell.com";
+  
+  if (!authToken) {
+    alert("Du må være innlogget");
+    return;
+  }
+
+  try {
+    const channels: InputChannel[] = await invoke("list_input_channels", {
+      backendUrl,
+      authToken
+    });
+
+    const selector = document.querySelector("#existing-channels") as HTMLSelectElement;
+    const channelSelectorDiv = document.querySelector("#channel-selector") as HTMLElement;
+    
+    selector.innerHTML = '<option value="">-- Velg kanal --</option>';
+    
+    // Filter out protected channels (Quick Channel)
+    const userChannels = channels.filter(ch => ch.title !== "Quick Channel" && !ch.title?.includes("Quick"));
+    
+    userChannels.forEach(channel => {
+      const option = document.createElement("option");
+      option.value = channel.id.toString();
+      option.textContent = `${channel.title || "Uten tittel"} (${channel.images_count || 0} bilder)`;
+      selector.appendChild(option);
+    });
+
+    channelSelectorDiv.style.display = "block";
+
+    if (userChannels.length === 0) {
+      alert("Ingen kanaler funnet. Opprett en ny kanal.");
+    }
+  } catch (error) {
+    console.error("Failed to load channels:", error);
+    alert(`Kunne ikke laste kanaler: ${error}`);
+  }
+}
+
+function showCreateChannelForm() {
+  const form = document.querySelector("#create-channel-form") as HTMLElement;
+  form.style.display = "block";
+}
+
+async function createNewChannel() {
+  const backendUrlInput = document.querySelector("#backend-url") as HTMLInputElement;
+  const titleInput = document.querySelector("#session-title") as HTMLInputElement;
+  const descriptionInput = document.querySelector("#session-description") as HTMLTextAreaElement;
+
+  const backendUrl = backendUrlInput?.value || "https://api.trollfjell.com";
+  const title = titleInput?.value.trim();
+  const description = descriptionInput?.value.trim() || null;
+
+  if (!title) {
+    alert("Tittel er påkrevd");
+    return;
+  }
+
+  if (!authToken) {
+    alert("Du må være innlogget");
+    return;
+  }
+
+  try {
+    const channel: InputChannel = await invoke("create_input_channel", {
+      backendUrl,
+      title,
+      description,
+      defaultAuthorId: null,
+      authToken
+    });
+
+    selectedInputChannelId = channel.id;
+
+    // Update UI
+    const form = document.querySelector("#create-channel-form") as HTMLElement;
+    const infoDiv = document.querySelector("#selected-channel-info") as HTMLElement;
+    const nameSpan = document.querySelector("#selected-channel-name");
+
+    form.style.display = "none";
+    infoDiv.style.display = "block";
+    if (nameSpan) {
+      nameSpan.textContent = `${channel.title} (ID: ${channel.id})`;
+    }
+
+    // Clear form
+    titleInput.value = "";
+    descriptionInput.value = "";
+
+    alert(`Kanal "${channel.title}" opprettet!`);
+  } catch (error) {
+    console.error("Failed to create channel:", error);
+    alert(`Kunne ikke opprette kanal: ${error}`);
+  }
+}
+
+function selectExistingChannel() {
+  const selector = document.querySelector("#existing-channels") as HTMLSelectElement;
+  const selectedValue = selector.value;
+
+  if (!selectedValue) {
+    selectedInputChannelId = null;
+    const infoDiv = document.querySelector("#selected-channel-info") as HTMLElement;
+    infoDiv.style.display = "none";
+    return;
+  }
+
+  selectedInputChannelId = parseInt(selectedValue);
+
+  const selectedOption = selector.options[selector.selectedIndex];
+  const channelName = selectedOption.textContent || "";
+
+  const infoDiv = document.querySelector("#selected-channel-info") as HTMLElement;
+  const nameSpan = document.querySelector("#selected-channel-name");
+
+  infoDiv.style.display = "block";
+  if (nameSpan) {
+    nameSpan.textContent = channelName;
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   // Initialize authentication
   initializeAuth();
@@ -561,10 +675,21 @@ window.addEventListener("DOMContentLoaded", () => {
   const openGalleryBtn = document.querySelector("#open-gallery-btn");
   const logoutBtn = document.querySelector("#logout-btn");
   
+  // Input channel event listeners
+  const loadChannelsBtn = document.querySelector("#load-channels-btn");
+  const showCreateChannelBtn = document.querySelector("#show-create-channel-btn");
+  const createChannelBtn = document.querySelector("#create-channel-btn");
+  const existingChannelsSelect = document.querySelector("#existing-channels");
+  
   selectDirBtn?.addEventListener("click", selectDirectory);
   startImportBtn?.addEventListener("click", startImport);
   openGalleryBtn?.addEventListener("click", openWebGallery);
   logoutBtn?.addEventListener("click", handleLogout);
+  
+  loadChannelsBtn?.addEventListener("click", loadInputChannels);
+  showCreateChannelBtn?.addEventListener("click", showCreateChannelForm);
+  createChannelBtn?.addEventListener("click", createNewChannel);
+  existingChannelsSelect?.addEventListener("change", selectExistingChannel);
   
   // Login screen event listeners
   const loginBtn = document.querySelector("#login-btn");
