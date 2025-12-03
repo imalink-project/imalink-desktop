@@ -314,6 +314,38 @@ fn scan_directory(dir_path: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
+async fn list_input_channels(
+    backend_url: String,
+    auth_token: String,
+) -> Result<Vec<InputChannel>, String> {
+    let client = reqwest::Client::new();
+    
+    let response = client
+        .get(format!("{}/api/v1/input-channels/", backend_url))
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send request to backend: {}", e))?;
+    
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        return Err(format!(
+            "Backend returned error {}: {}",
+            status, error_text
+        ));
+    }
+    
+    let response_text = response.text().await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+    
+    let channels: Vec<InputChannel> = serde_json::from_str(&response_text)
+        .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
+    
+    Ok(channels)
+}
+
+#[tauri::command]
 async fn create_input_channel(
     backend_url: String,
     title: Option<String>,
@@ -552,6 +584,7 @@ pub fn run() {
             greet, 
             process_image_file, 
             scan_directory,
+            list_input_channels,
             create_input_channel,
             upload_photo_create_schema,
             login,
