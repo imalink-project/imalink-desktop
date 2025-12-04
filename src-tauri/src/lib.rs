@@ -128,6 +128,13 @@ pub struct InputChannel {
     pub images_count: i32,
 }
 
+// Wrapper for list response from backend
+#[derive(Debug, Serialize, Deserialize)]
+struct InputChannelListResponse {
+    pub channels: Vec<InputChannel>,
+    pub total: i32,
+}
+
 // Structure for creating input channel
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InputChannelCreate {
@@ -436,10 +443,10 @@ async fn list_input_channels(
     let response_text = response.text().await
         .map_err(|e| format!("Failed to read response: {}", e))?;
     
-    let channels: Vec<InputChannel> = serde_json::from_str(&response_text)
+    let response_data: InputChannelListResponse = serde_json::from_str(&response_text)
         .map_err(|e| format!("Failed to parse response: {} | Response was: {}", e, response_text))?;
     
-    Ok(channels)
+    Ok(response_data.channels)
 }
 
 #[tauri::command]
