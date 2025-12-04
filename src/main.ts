@@ -196,7 +196,24 @@ async function startImport() {
   startImportBtn.disabled = true;
 
   try {
+    // Get import mode settings
+    const copyModeRadio = document.querySelector('input[name="import-mode"][value="copy"]') as HTMLInputElement;
+    const isCopyMode = copyModeRadio?.checked || false;
+    const destinationPath = (document.querySelector("#destination-path") as HTMLInputElement)?.value;
+    
+    // Validate Copy mode settings
+    if (isCopyMode && !destinationPath) {
+      if (statusEl) {
+        statusEl.textContent = "Feil: Du må velge destinasjonskatalog for Copy-modus";
+        statusEl.className = "error";
+      }
+      startImportBtn.disabled = false;
+      return;
+    }
+    
     console.log("Starting import process...");
+    console.log("Import mode:", isCopyMode ? "Copy" : "Register");
+    console.log("Destination path:", destinationPath);
     console.log("Backend URL:", backendUrl);
     console.log("Core API URL:", coreApiUrl);
     console.log("Auth token present:", !!authToken);
@@ -204,7 +221,7 @@ async function startImport() {
     console.log("Input channel ID:", selectedInputChannelId);
     
     if (statusEl) {
-      statusEl.textContent = `Bruker input channel ID: ${selectedInputChannelId}`;
+      statusEl.textContent = `Bruker input channel ID: ${selectedInputChannelId} (${isCopyMode ? 'Copy' : 'Register'} mode)`;
       statusEl.className = "success";
     }
 
@@ -218,7 +235,7 @@ async function startImport() {
       resultsEl.style.display = "block";
     }
 
-    const results: { file: string; success: boolean; error?: string; hothash?: string }[] = [];
+    const results: { file: string; success: boolean; error?: string; hothash?: string; isDuplicate?: boolean }[] = [];
 
     for (let i = 0; i < selectedFiles.length; i++) {
       const filePath = selectedFiles[i];
@@ -244,20 +261,71 @@ async function startImport() {
         });
         console.log(`Got PhotoCreateSchema for ${fileName}:`, photoCreateSchema.hothash);
 
-        // Step 2b: Upload PhotoCreateSchema to backend
+        // Step 2b: Handle file storage (copy or register)
+        let finalPath = filePath;
+        let localStorageInfo: any = {
+          import_mode: isCopyMode ? "copy" : "register",
+          source_path: filePath,
+          imported_from: selectedDirPath?.includes("/media/") || selectedDirPath?.includes("/mnt/") ? "sd_card" : "archive"
+        };
+
+        if (isCopyMode && destinationPath) {
+          console.log(`Copying file to ${destinationPath}`);
+          try {
+            finalPath = await invoke("copy_file_to_storage", {
+              sourcePath: filePath,
+              destinationDir: destinationPath,
+              preserveStructure: false,  // Flat copy for now
+              sourceBaseDir: null
+            });
+            console.log(`File copied to: ${finalPath}`);
+            localStorageInfo.storage_path = finalPath;
+          } catch (copyError) {
+            console.error(`Failed to copy file: ${copyError}`);
+            throw new Error(`Kunne ikke kopiere fil: ${copyError}`);
+          }
+        } else {
+          // Register mode - file stays where it is
+          localStorageInfo.storage_path = filePath;
+        }
+
+        // Step 2c: Upload PhotoCreateSchema to backend with file metadata
         console.log(`Calling upload_photo_create_schema for ${fileName}`);
+        
+        // Get file size from filesystem
+        const fileStats = await invoke("get_file_size", { filePath: finalPath }) as number;
+        
+        // Determine file format from extension
+        const fileExt = fileName.split('.').pop()?.toLowerCase() || "unknown";
+        const fileFormat = ["jpg", "jpeg"].includes(fileExt) ? "jpeg" : 
+                          ["cr2", "nef", "arw", "dng", "orf", "rw2"].includes(fileExt) ? "raw" : fileExt;
+        
         const uploadResult: PhotoCreateResponse = await invoke("upload_photo_create_schema", {
           backendUrl,
           photoCreateSchema,
           inputChannelId,
-          authToken
+          authToken,
+          filePath: finalPath,
+          fileSize: fileStats,
+          fileFormat: fileFormat,
+          localStorageInfo: localStorageInfo,
+          importedInfo: {
+            imported_at: new Date().toISOString(),
+            original_selection: selectedDirPath
+          }
         });
-        console.log(`Upload successful for ${fileName}:`, uploadResult.hothash);
+        
+        if (uploadResult.is_duplicate) {
+          console.log(`Duplicate skipped for ${fileName}:`, uploadResult.hothash);
+        } else {
+          console.log(`Upload successful for ${fileName}:`, uploadResult.hothash);
+        }
 
         results.push({
           file: fileName,
           success: true,
-          hothash: uploadResult.hothash
+          hothash: uploadResult.hothash,
+          isDuplicate: uploadResult.is_duplicate
         });
       } catch (error) {
         console.error(`Error processing ${fileName}:`, error);
@@ -270,18 +338,26 @@ async function startImport() {
     }
 
     // Step 3: Show results
-    const successCount = results.filter(r => r.success).length;
+    const successCount = results.filter(r => r.success && !r.isDuplicate).length;
+    const duplicateCount = results.filter(r => r.success && r.isDuplicate).length;
     const failCount = results.filter(r => !r.success).length;
 
     if (statusEl) {
-      statusEl.textContent = `Import fullført: ${successCount} suksess, ${failCount} feil`;
+      if (duplicateCount > 0) {
+        statusEl.textContent = `Import fullført: ${successCount} nye, ${duplicateCount} duplikater, ${failCount} feil`;
+      } else {
+        statusEl.textContent = `Import fullført: ${successCount} suksess, ${failCount} feil`;
+      }
       statusEl.className = failCount === 0 ? "success" : "warning";
     }
 
     if (resultsContentEl) {
       let html = `<h3>Sammendrag</h3>`;
       html += `<p><strong>Total:</strong> ${selectedFiles.length} filer</p>`;
-      html += `<p><strong>Suksess:</strong> ${successCount}</p>`;
+      html += `<p><strong>Nye bilder:</strong> ${successCount}</p>`;
+      if (duplicateCount > 0) {
+        html += `<p><strong>Duplikater (hoppet over):</strong> ${duplicateCount}</p>`;
+      }
       html += `<p><strong>Feil:</strong> ${failCount}</p>`;
       html += `<p><strong>Input Channel ID:</strong> ${inputChannelId}</p>`;
       
@@ -295,7 +371,17 @@ async function startImport() {
 
       html += `<details><summary>Alle filer (klikk for å utvide)</summary><ul>`;
       results.forEach(r => {
-        html += `<li>${r.success ? '✓' : '✗'} ${r.file}${r.hothash ? ` (${r.hothash.substring(0, 8)}...)` : ''}</li>`;
+        let icon = '✗';
+        let status = '';
+        if (r.success) {
+          if (r.isDuplicate) {
+            icon = '⊙';
+            status = ' <em>(duplikat)</em>';
+          } else {
+            icon = '✓';
+          }
+        }
+        html += `<li>${icon} ${r.file}${status}${r.hothash ? ` (${r.hothash.substring(0, 8)}...)` : ''}</li>`;
       });
       html += `</ul></details>`;
 
@@ -640,6 +726,44 @@ async function createNewChannel() {
   }
 }
 
+// ===== Import Mode Functions =====
+
+function handleImportModeChange() {
+  const copyRadio = document.querySelector('input[name="import-mode"][value="copy"]') as HTMLInputElement;
+  const copyDestinationDiv = document.querySelector("#copy-destination") as HTMLElement;
+  const registerInfoDiv = document.querySelector("#register-info") as HTMLElement;
+  
+  const isCopyMode = copyRadio?.checked || false;
+  
+  if (copyDestinationDiv) {
+    copyDestinationDiv.style.display = isCopyMode ? "block" : "none";
+  }
+  
+  if (registerInfoDiv) {
+    registerInfoDiv.style.display = isCopyMode ? "none" : "block";
+  }
+}
+
+async function selectDestinationDirectory() {
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: true,
+      title: "Velg destinasjonskatalog for kopiering"
+    });
+    
+    if (selected) {
+      const input = document.querySelector("#destination-path") as HTMLInputElement;
+      if (input) {
+        input.value = selected as string;
+      }
+    }
+  } catch (error) {
+    console.error("Failed to select destination directory:", error);
+    alert(`Kunne ikke velge katalog: ${error}`);
+  }
+}
+
 function selectExistingChannel() {
   const selector = document.querySelector("#existing-channels") as HTMLSelectElement;
   const selectedValue = selector.value;
@@ -690,6 +814,18 @@ window.addEventListener("DOMContentLoaded", () => {
   showCreateChannelBtn?.addEventListener("click", showCreateChannelForm);
   createChannelBtn?.addEventListener("click", createNewChannel);
   existingChannelsSelect?.addEventListener("change", selectExistingChannel);
+  
+  // Import mode event listeners
+  const importModeRadios = document.querySelectorAll('input[name="import-mode"]');
+  const selectDestinationBtn = document.querySelector("#select-destination-btn");
+  
+  importModeRadios.forEach(radio => {
+    radio.addEventListener("change", handleImportModeChange);
+  });
+  selectDestinationBtn?.addEventListener("click", selectDestinationDirectory);
+  
+  // Initialize import mode UI
+  handleImportModeChange();
   
   // Login screen event listeners
   const loginBtn = document.querySelector("#login-btn");

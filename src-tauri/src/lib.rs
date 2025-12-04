@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 // ===== Authentication Structures =====
 
@@ -139,6 +139,13 @@ pub struct ImageFileCreate {
     pub file_path: String,
     pub file_size: i64,
     pub file_format: String,
+    
+    // File handling metadata (flexible JSON structure)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub local_storage_info: Option<serde_json::Value>,
+    
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub imported_info: Option<serde_json::Value>,
 }
 
 // Structure for PhotoCreateSchema upload request - API v2.4
@@ -261,6 +268,80 @@ async fn process_image_file(file_path: String, core_api_url: String) -> Result<P
                             if response_text.len() > 500 { &response_text[..500] } else { &response_text }))?;
 
     Ok(photo_create_schema)
+}
+
+// Get file size in bytes
+#[tauri::command]
+fn get_file_size(file_path: String) -> Result<i64, String> {
+    let path = PathBuf::from(&file_path);
+    
+    if !path.exists() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    
+    let metadata = fs::metadata(&path)
+        .map_err(|e| format!("Failed to get file metadata: {}", e))?;
+    
+    Ok(metadata.len() as i64)
+}
+
+// Copy file to destination directory with optional structure preservation
+#[tauri::command]
+fn copy_file_to_storage(
+    source_path: String,
+    destination_dir: String,
+    preserve_structure: bool,
+    source_base_dir: Option<String>
+) -> Result<String, String> {
+    let source = PathBuf::from(&source_path);
+    let dest_dir = PathBuf::from(&destination_dir);
+    
+    if !source.exists() {
+        return Err(format!("Source file not found: {}", source_path));
+    }
+    
+    if !source.is_file() {
+        return Err(format!("Source is not a file: {}", source_path));
+    }
+    
+    if !dest_dir.exists() {
+        fs::create_dir_all(&dest_dir)
+            .map_err(|e| format!("Failed to create destination directory: {}", e))?;
+    }
+    
+    // Determine final destination path
+    let dest_path = if preserve_structure && source_base_dir.is_some() {
+        // Preserve directory structure relative to base
+        let base = PathBuf::from(source_base_dir.unwrap());
+        let relative = source.strip_prefix(&base)
+            .map_err(|_| "Source path not under base directory".to_string())?;
+        let final_dest = dest_dir.join(relative);
+        
+        // Create parent directories if needed
+        if let Some(parent) = final_dest.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create parent directories: {}", e))?;
+        }
+        
+        final_dest
+    } else {
+        // Flat copy - just filename
+        let filename = source.file_name()
+            .ok_or("Invalid source filename")?;
+        dest_dir.join(filename)
+    };
+    
+    // Check if destination exists
+    if dest_path.exists() {
+        return Err(format!("Destination file already exists: {}", dest_path.display()));
+    }
+    
+    // Copy file
+    fs::copy(&source, &dest_path)
+        .map_err(|e| format!("Failed to copy file: {}", e))?;
+    
+    // Return destination path as string
+    Ok(dest_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -394,15 +475,37 @@ async fn upload_photo_create_schema(
     photo_create_schema: PhotoCreateSchema,
     input_channel_id: i32,
     auth_token: String,
+    // Optional file tracking metadata
+    file_path: Option<String>,
+    file_size: Option<i64>,
+    file_format: Option<String>,
+    local_storage_info: Option<serde_json::Value>,
+    imported_info: Option<serde_json::Value>,
 ) -> Result<PhotoCreateResponse, String> {
     let client = reqwest::Client::new();
     
-    // Note: We don't have file_path or file_size here since we're working with PhotoCreateSchema
-    // Desktop app could optionally track these if needed
+    // Build ImageFileCreate if we have file metadata
+    let image_file = if let Some(path) = file_path {
+        Some(ImageFileCreate {
+            filename: PathBuf::from(&path)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string(),
+            file_path: path,
+            file_size: file_size.unwrap_or(0),
+            file_format: file_format.unwrap_or("unknown".to_string()),
+            local_storage_info,
+            imported_info,
+        })
+    } else {
+        None
+    };
+    
     let request_body = PhotoCreateRequest {
         photo_create_schema,
         input_channel_id: Some(input_channel_id),
-        image_file: None,  // Could be populated if we track original file path
+        image_file,
         rating: Some(0),  // Default rating
         visibility: Some("private".to_string()),  // Default visibility
         author_id: None,
@@ -418,8 +521,22 @@ async fn upload_photo_create_schema(
         .await
         .map_err(|e| format!("Failed to send request to backend: {}", e))?;
     
-    if !response.status().is_success() {
-        let status = response.status();
+    let status = response.status();
+    
+    // Handle 409 Conflict (duplicate) as success
+    if status == reqwest::StatusCode::CONFLICT {
+        let response_text = response.text().await
+            .map_err(|e| format!("Failed to read response: {}", e))?;
+        
+        let mut photo_response: PhotoCreateResponse = serde_json::from_str(&response_text)
+            .map_err(|e| format!("Failed to parse duplicate response: {} | Response was: {}", e, response_text))?;
+        
+        // Ensure is_duplicate is set to true
+        photo_response.is_duplicate = true;
+        return Ok(photo_response);
+    }
+    
+    if !status.is_success() {
         let error_text = response.text().await.unwrap_or_default();
         return Err(format!(
             "Backend returned error {}: {}",
@@ -584,6 +701,8 @@ pub fn run() {
             greet, 
             process_image_file, 
             scan_directory,
+            get_file_size,
+            copy_file_to_storage,
             list_input_channels,
             create_input_channel,
             upload_photo_create_schema,
