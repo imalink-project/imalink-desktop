@@ -64,6 +64,17 @@ interface ImageFileSchema {
   file_size?: number;
   format?: string | null;
   is_raw?: boolean;
+  local_storage_info?: any;
+  imported_info?: any;
+}
+
+// Companion file grouping
+interface CompanionGroup {
+  basename: string;
+  masterFile: string;
+  companionFiles: string[];
+  allFiles: string[];
+  masterPriority: number;
 }
 
 // InputChannel structure - matches imalink backend API v2.4
@@ -157,6 +168,84 @@ async function selectDirectory() {
   }
 }
 
+// ===== Companion File Detection =====
+
+function groupCompanionFiles(filePaths: string[]): CompanionGroup[] {
+  // File extension priorities (lower = preferred master)
+  const priorities: Record<string, number> = {
+    'jpg': 1,
+    'jpeg': 1,
+    'heic': 2,
+    'png': 3,
+    'cr2': 10,
+    'nef': 10,
+    'arw': 10,
+    'dng': 10,
+    'orf': 10,
+    'rw2': 10,
+    'raw': 10
+  };
+
+  // Group files by directory + basename
+  const groups = new Map<string, { files: string[], exts: string[], priorities: number[] }>();
+
+  for (const filePath of filePaths) {
+    const parts = filePath.split('/');
+    const fileName = parts[parts.length - 1];
+    const directory = parts.slice(0, -1).join('/');
+    const lastDot = fileName.lastIndexOf('.');
+    
+    if (lastDot === -1) continue; // Skip files without extension
+    
+    const basename = fileName.substring(0, lastDot);
+    const ext = fileName.substring(lastDot + 1).toLowerCase();
+    const priority = priorities[ext] || 99;
+    
+    // Group key = directory + basename (same-directory matching only)
+    const groupKey = `${directory}/${basename}`;
+    
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, { files: [], exts: [], priorities: [] });
+    }
+    
+    const group = groups.get(groupKey)!;
+    group.files.push(filePath);
+    group.exts.push(ext);
+    group.priorities.push(priority);
+  }
+
+  // Convert to CompanionGroup array
+  const companionGroups: CompanionGroup[] = [];
+
+  for (const [groupKey, group] of groups) {
+    const basename = groupKey.split('/').pop() || groupKey;
+    
+    // Find master file (lowest priority number)
+    let masterIndex = 0;
+    let lowestPriority = group.priorities[0];
+    
+    for (let i = 1; i < group.priorities.length; i++) {
+      if (group.priorities[i] < lowestPriority) {
+        lowestPriority = group.priorities[i];
+        masterIndex = i;
+      }
+    }
+    
+    const masterFile = group.files[masterIndex];
+    const companionFiles = group.files.filter((_, i) => i !== masterIndex);
+    
+    companionGroups.push({
+      basename,
+      masterFile,
+      companionFiles,
+      allFiles: group.files,
+      masterPriority: lowestPriority
+    });
+  }
+
+  return companionGroups;
+}
+
 async function startImport() {
   if (selectedFiles.length === 0) {
     return;
@@ -227,7 +316,12 @@ async function startImport() {
 
     const inputChannelId = selectedInputChannelId;
 
-    // Step 2: Process each file
+    // Step 2: Group files by companions
+    console.log("Grouping companion files...");
+    const companionGroups = groupCompanionFiles(selectedFiles);
+    console.log(`Found ${companionGroups.length} groups from ${selectedFiles.length} files`);
+
+    // Step 3: Process each group
     if (progressEl) {
       progressEl.style.display = "block";
     }
@@ -235,50 +329,71 @@ async function startImport() {
       resultsEl.style.display = "block";
     }
 
-    const results: { file: string; success: boolean; error?: string; hothash?: string; isDuplicate?: boolean }[] = [];
+    const results: { file: string; success: boolean; error?: string; hothash?: string; isDuplicate?: boolean; isSkipped?: boolean; skipReason?: string; companionCount?: number }[] = [];
 
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const filePath = selectedFiles[i];
-      const fileName = filePath.split('/').pop() || filePath;
+    for (let i = 0; i < companionGroups.length; i++) {
+      const group = companionGroups[i];
+      const masterFilePath = group.masterFile;
+      const masterFileName = masterFilePath.split('/').pop() || masterFilePath;
+      const companionCount = group.companionFiles.length;
       
       // Update progress
-      const progress = ((i + 1) / selectedFiles.length) * 100;
+      const progress = ((i + 1) / companionGroups.length) * 100;
       if (progressFillEl) {
         progressFillEl.style.width = `${progress}%`;
       }
       if (progressTextEl) {
-        progressTextEl.textContent = `Behandler fil ${i + 1} av ${selectedFiles.length}: ${fileName}`;
+        const groupInfo = companionCount > 0 ? ` + ${companionCount} companion(s)` : '';
+        progressTextEl.textContent = `Behandler gruppe ${i + 1} av ${companionGroups.length}: ${masterFileName}${groupInfo}`;
       }
 
       try {
-        console.log(`Processing file: ${fileName}`);
+        console.log(`Processing group: ${group.basename} (master: ${masterFileName}, companions: ${companionCount})`);
         
-        // Step 2a: Send to imalink-core to get PhotoCreateSchema
-        console.log(`Calling process_image_file for ${fileName}`);
-        const photoCreateSchema: PhotoCreateSchema = await invoke("process_image_file", {
-          filePath,
-          coreApiUrl
-        });
-        console.log(`Got PhotoCreateSchema for ${fileName}:`, photoCreateSchema.hothash);
+        // Step 3a: Process master file through imalink-core
+        console.log(`Calling process_image_file for master: ${masterFileName}`);
+        let photoCreateSchema: PhotoCreateSchema;
+        
+        try {
+          photoCreateSchema = await invoke("process_image_file", {
+            filePath: masterFilePath,
+            coreApiUrl
+          });
+          console.log(`Got PhotoCreateSchema for ${masterFileName}:`, photoCreateSchema.hothash);
+        } catch (coreError) {
+          // Failed to process master file (likely RAW without rawpy support)
+          console.warn(`Cannot process master file ${masterFileName}:`, coreError);
+          results.push({
+            file: masterFileName,
+            success: false,
+            isSkipped: true,
+            skipReason: `Cannot process file: ${String(coreError)}`,
+            companionCount
+          });
+          continue; // Skip this group
+        }
 
-        // Step 2b: Handle file storage (copy or register)
-        let finalPath = filePath;
+        // Step 3b: Handle file storage for master (copy or register)
+        let finalPath = masterFilePath;
+        const allFilenames = group.allFiles.map(f => f.split('/').pop() || f);
+        
         let localStorageInfo: any = {
           import_mode: isCopyMode ? "copy" : "register",
-          source_path: filePath,
-          imported_from: selectedDirPath?.includes("/media/") || selectedDirPath?.includes("/mnt/") ? "sd_card" : "archive"
+          source_path: masterFilePath,
+          imported_from: selectedDirPath?.includes("/media/") || selectedDirPath?.includes("/mnt/") ? "sd_card" : "archive",
+          companion_files: allFilenames  // Include all files in group
         };
 
         if (isCopyMode && destinationPath) {
-          console.log(`Copying file to ${destinationPath}`);
+          console.log(`Copying master file to ${destinationPath}`);
           try {
             finalPath = await invoke("copy_file_to_storage", {
-              sourcePath: filePath,
+              sourcePath: masterFilePath,
               destinationDir: destinationPath,
               preserveStructure: false,  // Flat copy for now
               sourceBaseDir: null
             });
-            console.log(`File copied to: ${finalPath}`);
+            console.log(`Master file copied to: ${finalPath}`);
             localStorageInfo.storage_path = finalPath;
           } catch (copyError) {
             console.error(`Failed to copy file: ${copyError}`);
@@ -286,90 +401,166 @@ async function startImport() {
           }
         } else {
           // Register mode - file stays where it is
-          localStorageInfo.storage_path = filePath;
+          localStorageInfo.storage_path = masterFilePath;
         }
 
-        // Step 2c: Upload PhotoCreateSchema to backend with file metadata
-        console.log(`Calling upload_photo_create_schema for ${fileName}`);
+        // Step 3c: Get master file metadata
+        console.log(`Getting metadata for master: ${masterFileName}`);
         
-        // Get file size from filesystem
-        const fileStats = await invoke("get_file_size", { filePath: finalPath }) as number;
+        // Step 3d: Update PhotoCreateSchema's image_file_list with master metadata
+        if (!photoCreateSchema.image_file_list) {
+          photoCreateSchema.image_file_list = [];
+        }
         
-        // Determine file format from extension
-        const fileExt = fileName.split('.').pop()?.toLowerCase() || "unknown";
-        const fileFormat = ["jpg", "jpeg"].includes(fileExt) ? "jpeg" : 
-                          ["cr2", "nef", "arw", "dng", "orf", "rw2"].includes(fileExt) ? "raw" : fileExt;
+        // Update master file's local_storage_info in image_file_list
+        if (photoCreateSchema.image_file_list.length > 0) {
+          photoCreateSchema.image_file_list[0].local_storage_info = localStorageInfo;
+          photoCreateSchema.image_file_list[0].imported_info = {
+            imported_at: new Date().toISOString(),
+            original_selection: selectedDirPath
+          };
+        }
+        
+        // Step 3e: Add companion files to image_file_list
+        for (const companionPath of group.companionFiles) {
+          const companionFileName = companionPath.split('/').pop() || companionPath;
+          console.log(`Adding companion file: ${companionFileName}`);
+          
+          // Handle file storage for companion
+          let companionFinalPath = companionPath;
+          let companionLocalStorageInfo: any = {
+            import_mode: isCopyMode ? "copy" : "register",
+            source_path: companionPath,
+            imported_from: selectedDirPath?.includes("/media/") || selectedDirPath?.includes("/mnt/") ? "sd_card" : "archive",
+            companion_files: allFilenames
+          };
+          
+          if (isCopyMode && destinationPath) {
+            console.log(`Copying companion file to ${destinationPath}`);
+            try {
+              companionFinalPath = await invoke("copy_file_to_storage", {
+                sourcePath: companionPath,
+                destinationDir: destinationPath,
+                preserveStructure: false,
+                sourceBaseDir: null
+              });
+              companionLocalStorageInfo.storage_path = companionFinalPath;
+            } catch (copyError) {
+              console.error(`Failed to copy companion file: ${copyError}`);
+              // Continue anyway - companion copy is not critical
+              companionLocalStorageInfo.storage_path = companionPath;
+            }
+          } else {
+            companionLocalStorageInfo.storage_path = companionPath;
+          }
+          
+          // Get companion file metadata
+          const companionFileSize = await invoke("get_file_size", { filePath: companionFinalPath }) as number;
+          const companionFileExt = companionFileName.split('.').pop()?.toLowerCase() || "unknown";
+          const companionFileFormat = ["jpg", "jpeg"].includes(companionFileExt) ? "jpeg" : 
+                                     ["cr2", "nef", "arw", "dng", "orf", "rw2"].includes(companionFileExt) ? "raw" : companionFileExt;
+          
+          // Add companion to image_file_list (NO hotpreview/hothash/exif_dict)
+          photoCreateSchema.image_file_list.push({
+            filename: companionFileName,
+            file_size: companionFileSize,
+            format: companionFileFormat,
+            is_raw: companionFileFormat === "raw",
+            local_storage_info: companionLocalStorageInfo,
+            imported_info: {
+              imported_at: new Date().toISOString(),
+              original_selection: selectedDirPath
+            }
+          });
+        }
+        
+        // Step 3f: Upload complete PhotoCreateSchema to backend
+        console.log(`Uploading PhotoCreateSchema for ${masterFileName} with ${photoCreateSchema.image_file_list.length} file(s)`);
         
         const uploadResult: PhotoCreateResponse = await invoke("upload_photo_create_schema", {
           backendUrl,
           photoCreateSchema,
           inputChannelId,
-          authToken,
-          filePath: finalPath,
-          fileSize: fileStats,
-          fileFormat: fileFormat,
-          localStorageInfo: localStorageInfo,
-          importedInfo: {
-            imported_at: new Date().toISOString(),
-            original_selection: selectedDirPath
-          }
+          authToken
         });
         
         if (uploadResult.is_duplicate) {
-          console.log(`Duplicate skipped for ${fileName}:`, uploadResult.hothash);
+          console.log(`Duplicate skipped for ${masterFileName}:`, uploadResult.hothash);
         } else {
-          console.log(`Upload successful for ${fileName}:`, uploadResult.hothash);
+          console.log(`Upload successful for ${masterFileName}:`, uploadResult.hothash);
         }
 
         results.push({
-          file: fileName,
+          file: masterFileName,
           success: true,
           hothash: uploadResult.hothash,
-          isDuplicate: uploadResult.is_duplicate
+          isDuplicate: uploadResult.is_duplicate,
+          companionCount
         });
       } catch (error) {
-        console.error(`Error processing ${fileName}:`, error);
+        console.error(`Error processing ${masterFileName}:`, error);
         results.push({
-          file: fileName,
+          file: masterFileName,
           success: false,
-          error: String(error)
+          error: String(error),
+          companionCount
         });
       }
     }
 
-    // Step 3: Show results
-    const successCount = results.filter(r => r.success && !r.isDuplicate).length;
+    // Step 4: Show results
+    const successCount = results.filter(r => r.success && !r.isDuplicate && !r.isSkipped).length;
     const duplicateCount = results.filter(r => r.success && r.isDuplicate).length;
-    const failCount = results.filter(r => !r.success).length;
+    const skippedCount = results.filter(r => r.isSkipped).length;
+    const failCount = results.filter(r => !r.success && !r.isSkipped).length;
+    const totalCompanions = results.reduce((sum, r) => sum + (r.companionCount || 0), 0);
 
     if (statusEl) {
-      if (duplicateCount > 0) {
-        statusEl.textContent = `Import fullført: ${successCount} nye, ${duplicateCount} duplikater, ${failCount} feil`;
-      } else {
-        statusEl.textContent = `Import fullført: ${successCount} suksess, ${failCount} feil`;
-      }
-      statusEl.className = failCount === 0 ? "success" : "warning";
+      const parts = [];
+      if (successCount > 0) parts.push(`${successCount} nye`);
+      if (duplicateCount > 0) parts.push(`${duplicateCount} duplikater`);
+      if (skippedCount > 0) parts.push(`${skippedCount} hoppet over`);
+      if (failCount > 0) parts.push(`${failCount} feil`);
+      
+      statusEl.textContent = `Import fullført: ${parts.join(', ')}`;
+      statusEl.className = (failCount === 0 && skippedCount === 0) ? "success" : "warning";
     }
 
     if (resultsContentEl) {
       let html = `<h3>Sammendrag</h3>`;
-      html += `<p><strong>Total:</strong> ${selectedFiles.length} filer</p>`;
+      html += `<p><strong>Totalt behandlet:</strong> ${companionGroups.length} grupper (${selectedFiles.length} filer)</p>`;
       html += `<p><strong>Nye bilder:</strong> ${successCount}</p>`;
+      if (totalCompanions > 0) {
+        html += `<p><strong>Companion-filer:</strong> ${totalCompanions}</p>`;
+      }
       if (duplicateCount > 0) {
         html += `<p><strong>Duplikater (hoppet over):</strong> ${duplicateCount}</p>`;
+      }
+      if (skippedCount > 0) {
+        html += `<p><strong>Hoppet over (kan ikke prosessere):</strong> ${skippedCount}</p>`;
       }
       html += `<p><strong>Feil:</strong> ${failCount}</p>`;
       html += `<p><strong>Input Channel ID:</strong> ${inputChannelId}</p>`;
       
+      if (skippedCount > 0) {
+        html += `<h3>⚠ Hoppet over:</h3><ul>`;
+        results.filter(r => r.isSkipped).forEach(r => {
+          const companionInfo = (r.companionCount || 0) > 0 ? ` (+${r.companionCount} companion(s))` : '';
+          html += `<li><strong>${r.file}${companionInfo}:</strong> ${r.skipReason}</li>`;
+        });
+        html += `</ul>`;
+      }
+      
       if (failCount > 0) {
-        html += `<h3>Feil:</h3><ul>`;
-        results.filter(r => !r.success).forEach(r => {
-          html += `<li><strong>${r.file}:</strong> ${r.error}</li>`;
+        html += `<h3>❌ Feil:</h3><ul>`;
+        results.filter(r => !r.success && !r.isSkipped).forEach(r => {
+          const companionInfo = (r.companionCount || 0) > 0 ? ` (+${r.companionCount} companion(s))` : '';
+          html += `<li><strong>${r.file}${companionInfo}:</strong> ${r.error}</li>`;
         });
         html += `</ul>`;
       }
 
-      html += `<details><summary>Alle filer (klikk for å utvide)</summary><ul>`;
+      html += `<details><summary>Alle grupper (klikk for å utvide)</summary><ul>`;
       results.forEach(r => {
         let icon = '✗';
         let status = '';
@@ -380,8 +571,12 @@ async function startImport() {
           } else {
             icon = '✓';
           }
+        } else if (r.isSkipped) {
+          icon = '⚠';
+          status = ' <em>(hoppet over)</em>';
         }
-        html += `<li>${icon} ${r.file}${status}${r.hothash ? ` (${r.hothash.substring(0, 8)}...)` : ''}</li>`;
+        const companionInfo = (r.companionCount || 0) > 0 ? ` +${r.companionCount}` : '';
+        html += `<li>${icon} ${r.file}${companionInfo}${status}${r.hothash ? ` (${r.hothash.substring(0, 8)}...)` : ''}</li>`;
       });
       html += `</ul></details>`;
 

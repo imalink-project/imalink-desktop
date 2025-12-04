@@ -475,37 +475,16 @@ async fn upload_photo_create_schema(
     photo_create_schema: PhotoCreateSchema,
     input_channel_id: i32,
     auth_token: String,
-    // Optional file tracking metadata
-    file_path: Option<String>,
-    file_size: Option<i64>,
-    file_format: Option<String>,
-    local_storage_info: Option<serde_json::Value>,
-    imported_info: Option<serde_json::Value>,
 ) -> Result<PhotoCreateResponse, String> {
     let client = reqwest::Client::new();
     
-    // Build ImageFileCreate if we have file metadata
-    let image_file = if let Some(path) = file_path {
-        Some(ImageFileCreate {
-            filename: PathBuf::from(&path)
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("unknown")
-                .to_string(),
-            file_path: path,
-            file_size: file_size.unwrap_or(0),
-            file_format: file_format.unwrap_or("unknown".to_string()),
-            local_storage_info,
-            imported_info,
-        })
-    } else {
-        None
-    };
+    // PhotoCreateSchema now contains complete image_file_list from frontend
+    // No need to build image_file separately - it's already in photo_create_schema.image_file_list
     
     let request_body = PhotoCreateRequest {
         photo_create_schema,
         input_channel_id: Some(input_channel_id),
-        image_file,
+        image_file: None,  // Deprecated - data is now in photo_create_schema.image_file_list
         rating: Some(0),  // Default rating
         visibility: Some("private".to_string()),  // Default visibility
         author_id: None,
