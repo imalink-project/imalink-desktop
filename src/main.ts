@@ -138,11 +138,26 @@ async function selectDirectory() {
         dirPath: selectedDirPath
       });
       
+      // Group files to detect companions
+      const companionGroups = groupCompanionFiles(selectedFiles);
+      const totalFiles = companionGroups.reduce((sum, g) => sum + g.allFiles.length, 0);
+      const companionCount = totalFiles - selectedFiles.length;
+      
       if (filesEl) {
-        filesEl.innerHTML = `<p>Funnet ${selectedFiles.length} JPEG-filer</p>`;
-        if (selectedFiles.length > 0) {
-          const fileList = selectedFiles.slice(0, 10).map(f => `<li>${f}</li>`).join('');
-          filesEl.innerHTML += `<ul>${fileList}${selectedFiles.length > 10 ? `<li>... og ${selectedFiles.length - 10} flere</li>` : ''}</ul>`;
+        filesEl.innerHTML = `<p>Funnet ${selectedFiles.length} JPEG-filer`;
+        if (companionCount > 0) {
+          filesEl.innerHTML += ` + ${companionCount} companion-filer (RAW/andre formater)`;
+        }
+        filesEl.innerHTML += `</p>`;
+        
+        if (companionGroups.length > 0) {
+          const groupList = companionGroups.slice(0, 10).map(g => {
+            const basename = g.basename;
+            const fileCount = g.allFiles.length;
+            const fileNames = g.allFiles.map(f => f.split('/').pop()).join(', ');
+            return `<li><strong>${basename}</strong> (${fileCount} fil${fileCount > 1 ? 'er' : ''}): ${fileNames}</li>`;
+          }).join('');
+          filesEl.innerHTML += `<ul>${groupList}${companionGroups.length > 10 ? `<li>... og ${companionGroups.length - 10} flere grupper</li>` : ''}</ul>`;
         }
       }
       
@@ -155,7 +170,7 @@ async function selectDirectory() {
       }
       
       if (statusEl) {
-        statusEl.textContent = selectedFiles.length > 0 ? `✓ Funnet ${selectedFiles.length} filer` : "Ingen JPEG-filer funnet";
+        statusEl.textContent = selectedFiles.length > 0 ? `✓ Funnet ${totalFiles} filer i ${companionGroups.length} grupper` : "Ingen JPEG-filer funnet";
         statusEl.className = selectedFiles.length > 0 ? "success" : "error";
       }
     }
