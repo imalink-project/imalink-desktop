@@ -360,10 +360,22 @@ fn scan_directory(dir_path: String) -> Result<Vec<String>, String> {
         return Err(format!("Path is not a directory: {}", dir_path));
     }
     
-    let mut jpeg_files: Vec<String> = Vec::new();
+    let mut image_files: Vec<String> = Vec::new();
+    
+    // Supported image extensions for companion detection
+    let supported_extensions = vec![
+        // JPEG formats (master priority 1)
+        "jpg", "jpeg",
+        // HEIC format (master priority 2)
+        "heic", "heif",
+        // PNG format (master priority 3)
+        "png",
+        // RAW formats (master priority 10)
+        "arw", "cr2", "cr3", "nef", "dng", "orf", "raf", "rw2", "raw"
+    ];
     
     // Recursive function to scan directories
-    fn scan_recursive(path: &PathBuf, files: &mut Vec<String>) -> Result<(), String> {
+    fn scan_recursive(path: &PathBuf, files: &mut Vec<String>, extensions: &Vec<&str>) -> Result<(), String> {
         let entries = fs::read_dir(path)
             .map_err(|e| format!("Failed to read directory: {}", e))?;
         
@@ -373,12 +385,12 @@ fn scan_directory(dir_path: String) -> Result<Vec<String>, String> {
             
             if entry_path.is_dir() {
                 // Recurse into subdirectory
-                scan_recursive(&entry_path, files)?;
+                scan_recursive(&entry_path, files, extensions)?;
             } else if entry_path.is_file() {
-                // Check if it's a JPEG file
+                // Check if it's a supported image file
                 if let Some(ext) = entry_path.extension() {
                     let ext_lower = ext.to_string_lossy().to_lowercase();
-                    if ext_lower == "jpg" || ext_lower == "jpeg" {
+                    if extensions.contains(&ext_lower.as_str()) {
                         if let Some(path_str) = entry_path.to_str() {
                             files.push(path_str.to_string());
                         }
@@ -390,12 +402,12 @@ fn scan_directory(dir_path: String) -> Result<Vec<String>, String> {
         Ok(())
     }
     
-    scan_recursive(&path, &mut jpeg_files)?;
+    scan_recursive(&path, &mut image_files, &supported_extensions)?;
     
     // Sort files for consistent ordering
-    jpeg_files.sort();
+    image_files.sort();
     
-    Ok(jpeg_files)
+    Ok(image_files)
 }
 
 #[tauri::command]

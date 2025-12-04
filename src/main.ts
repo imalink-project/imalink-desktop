@@ -141,14 +141,9 @@ async function selectDirectory() {
       // Group files to detect companions
       const companionGroups = groupCompanionFiles(selectedFiles);
       const totalFiles = companionGroups.reduce((sum, g) => sum + g.allFiles.length, 0);
-      const companionCount = totalFiles - selectedFiles.length;
       
       if (filesEl) {
-        filesEl.innerHTML = `<p>Funnet ${selectedFiles.length} JPEG-filer`;
-        if (companionCount > 0) {
-          filesEl.innerHTML += ` + ${companionCount} companion-filer (RAW/andre formater)`;
-        }
-        filesEl.innerHTML += `</p>`;
+        filesEl.innerHTML = `<p>Funnet ${totalFiles} bildefiler i ${companionGroups.length} grupper</p>`;
         
         if (companionGroups.length > 0) {
           const groupList = companionGroups.slice(0, 10).map(g => {
@@ -170,7 +165,7 @@ async function selectDirectory() {
       }
       
       if (statusEl) {
-        statusEl.textContent = selectedFiles.length > 0 ? `✓ Funnet ${totalFiles} filer i ${companionGroups.length} grupper` : "Ingen JPEG-filer funnet";
+        statusEl.textContent = selectedFiles.length > 0 ? `✓ Funnet ${totalFiles} filer i ${companionGroups.length} grupper` : "Ingen bildefiler funnet";
         statusEl.className = selectedFiles.length > 0 ? "success" : "error";
       }
     }
