@@ -476,6 +476,7 @@ async function startImport() {
         
         // Step 3f: Upload complete PhotoCreateSchema to backend
         console.log(`Uploading PhotoCreateSchema for ${masterFileName} with ${photoCreateSchema.image_file_list.length} file(s)`);
+        console.log('PhotoCreateSchema.image_file_list:', JSON.stringify(photoCreateSchema.image_file_list, null, 2));
         
         const uploadResult: PhotoCreateResponse = await invoke("upload_photo_create_schema", {
           backendUrl,

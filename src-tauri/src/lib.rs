@@ -90,6 +90,10 @@ pub struct ImageFileSchema {
     pub format: Option<String>,
     #[serde(default)]
     pub is_raw: bool,
+    #[serde(default)]
+    pub local_storage_info: Option<serde_json::Value>,
+    #[serde(default)]
+    pub imported_info: Option<serde_json::Value>,
 }
 
 impl Default for PhotoCreateSchema {
