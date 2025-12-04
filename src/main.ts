@@ -329,7 +329,7 @@ async function startImport() {
       resultsEl.style.display = "block";
     }
 
-    const results: { file: string; success: boolean; error?: string; hothash?: string; isDuplicate?: boolean; isSkipped?: boolean; skipReason?: string; companionCount?: number }[] = [];
+    const results: { file: string; success: boolean; error?: string; hothash?: string; isDuplicate?: boolean; isSkipped?: boolean; skipReason?: string; companionCount?: number; allFiles?: string[] }[] = [];
 
     for (let i = 0; i < companionGroups.length; i++) {
       const group = companionGroups[i];
@@ -368,7 +368,8 @@ async function startImport() {
             success: false,
             isSkipped: true,
             skipReason: `Cannot process file: ${String(coreError)}`,
-            companionCount
+            companionCount,
+            allFiles: group.allFiles.map(f => f.split('/').pop() || f)
           });
           continue; // Skip this group
         }
@@ -496,7 +497,8 @@ async function startImport() {
           success: true,
           hothash: uploadResult.hothash,
           isDuplicate: uploadResult.is_duplicate,
-          companionCount
+          companionCount,
+          allFiles: group.allFiles.map(f => f.split('/').pop() || f)
         });
       } catch (error) {
         console.error(`Error processing ${masterFileName}:`, error);
@@ -504,7 +506,8 @@ async function startImport() {
           file: masterFileName,
           success: false,
           error: String(error),
-          companionCount
+          companionCount,
+          allFiles: group.allFiles.map(f => f.split('/').pop() || f)
         });
       }
     }
@@ -577,7 +580,8 @@ async function startImport() {
           status = ' <em>(hoppet over)</em>';
         }
         const companionInfo = (r.companionCount || 0) > 0 ? ` +${r.companionCount}` : '';
-        html += `<li>${icon} ${r.file}${companionInfo}${status}${r.hothash ? ` (${r.hothash.substring(0, 8)}...)` : ''}</li>`;
+        const fileList = r.allFiles && r.allFiles.length > 0 ? `<br>&nbsp;&nbsp;&nbsp;&nbsp;📁 Filer: ${r.allFiles.join(', ')}` : '';
+        html += `<li>${icon} ${r.file}${companionInfo}${status}${r.hothash ? ` (${r.hothash.substring(0, 8)}...)` : ''}${fileList}</li>`;
       });
       html += `</ul></details>`;
 
