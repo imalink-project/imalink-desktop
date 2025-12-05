@@ -514,6 +514,10 @@ async fn upload_photo_create_schema(
         category: None,
     };
     
+    // Log what we're sending to backend
+    println!("Uploading photo to input_channel_id: {}", input_channel_id);
+    println!("Request body input_channel_id: {:?}", request_body.input_channel_id);
+    
     let response = client
         .post(format!("{}/api/v1/photos/create", backend_url))
         .header("Authorization", format!("Bearer {}", auth_token))
