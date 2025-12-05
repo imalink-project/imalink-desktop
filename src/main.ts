@@ -310,14 +310,15 @@ async function startImport() {
       return;
     }
     
-    console.log("Starting import process...");
+    console.log("=== Starting import process ===");
     console.log("Import mode:", isCopyMode ? "Copy" : "Register");
     console.log("Destination path:", destinationPath);
     console.log("Backend URL:", backendUrl);
     console.log("Core API URL:", coreApiUrl);
     console.log("Auth token present:", !!authToken);
     console.log("Selected files count:", selectedFiles.length);
-    console.log("Input channel ID:", selectedInputChannelId);
+    console.log("selectedInputChannelId (global var):", selectedInputChannelId);
+    console.log("Type of selectedInputChannelId:", typeof selectedInputChannelId);
     
     if (statusEl) {
       statusEl.textContent = `Bruker input channel ID: ${selectedInputChannelId} (${isCopyMode ? 'Copy' : 'Register'} mode)`;
@@ -325,6 +326,7 @@ async function startImport() {
     }
 
     const inputChannelId = selectedInputChannelId;
+    console.log("Local variable inputChannelId set to:", inputChannelId);
 
     // Step 2: Group files by companions
     console.log("Grouping companion files...");
@@ -987,6 +989,7 @@ function selectExistingChannel() {
   }
 
   selectedInputChannelId = parseInt(selectedValue);
+  console.log(`Channel selected from dropdown: ID=${selectedInputChannelId}, value="${selectedValue}"`);
 
   const selectedOption = selector.options[selector.selectedIndex];
   const channelName = selectedOption.textContent || "";
