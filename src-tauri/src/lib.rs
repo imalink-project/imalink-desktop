@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{WebviewUrl, WebviewWindowBuilder, Manager};
+use tauri_plugin_shell::ShellExt;
 
 // ===== Authentication Structures =====
 
@@ -723,7 +724,18 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .setup(|app| {
+            // Start imalink-core sidecar on app startup
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = start_core_server(app_handle).await {
+                    eprintln!("Failed to start imalink-core: {}", e);
+                }
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet, 
             process_image_file, 
@@ -741,6 +753,40 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// ===== Core Server Management =====
+
+async fn start_core_server(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_shell::process::CommandEvent;
+    
+    println!("Starting imalink-core server...");
+    
+    let sidecar_command = app.shell()
+        .sidecar("imalink-core")
+        .map_err(|e| format!("Failed to create sidecar command: {}", e))?;
+    
+    let (mut rx, _child) = sidecar_command
+        .spawn()
+        .map_err(|e| format!("Failed to spawn imalink-core: {}", e))?;
+    
+    // Listen to core output in background
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Stdout(line) => println!("[imalink-core] {}", line),
+                CommandEvent::Stderr(line) => eprintln!("[imalink-core] {}", line),
+                CommandEvent::Terminated(payload) => {
+                    println!("[imalink-core] Terminated with code: {:?}", payload.code);
+                    break;
+                }
+                _ => {}
+            }
+        }
+    });
+    
+    println!("✓ imalink-core server started");
+    Ok(())
 }
 
 // ===== Web Gallery Integration =====
