@@ -318,15 +318,9 @@ async function startImport() {
       return;
     }
     
-    console.log("=== Starting import process ===");
+    console.log("Starting import process...");
     console.log("Import mode:", isCopyMode ? "Copy" : "Register");
-    console.log("Destination path:", destinationPath);
-    console.log("Backend URL:", backendUrl);
-    console.log("Core API URL:", coreApiUrl);
-    console.log("Auth token present:", !!authToken);
     console.log("Selected files count:", selectedFiles.length);
-    console.log("selectedInputChannelId (global var):", selectedInputChannelId);
-    console.log("Type of selectedInputChannelId:", typeof selectedInputChannelId);
     
     if (statusEl) {
       statusEl.textContent = `Bruker input channel ID: ${selectedInputChannelId} (${isCopyMode ? 'Copy' : 'Register'} mode)`;
@@ -334,7 +328,6 @@ async function startImport() {
     }
 
     const inputChannelId = selectedInputChannelId;
-    console.log("Local variable inputChannelId set to:", inputChannelId);
 
     // Step 2: Group files by companions
     console.log("Grouping companion files...");
@@ -499,16 +492,7 @@ async function startImport() {
         photoCreateSchema.input_channel_id = inputChannelId;
         
         // Upload complete PhotoCreateSchema to backend
-        console.log(`Uploading PhotoCreateSchema for ${masterFileName} with ${photoCreateSchema.image_file_list.length} file(s)`);
-        console.log(`Using input_channel_id: ${inputChannelId}`);
-        
-        // Debug: Print schema without large base64 fields
-        const debugSchema = { ...photoCreateSchema };
-        if (debugSchema.hotpreview_base64) debugSchema.hotpreview_base64 = `[${debugSchema.hotpreview_base64.length} chars]`;
-        if (debugSchema.coldpreview_base64) debugSchema.coldpreview_base64 = `[${debugSchema.coldpreview_base64?.length || 0} chars]`;
-        console.log('=== PhotoCreateSchema (previews truncated) ===');
-        console.log(JSON.stringify(debugSchema, null, 2));
-        console.log('=== END PhotoCreateSchema ===');
+        console.log(`Uploading ${masterFileName} to channel ${inputChannelId}`);
         
         const uploadResult: PhotoCreateResponse = await invoke("upload_photo_create_schema", {
           backendUrl,
@@ -1007,7 +991,6 @@ function selectExistingChannel() {
   }
 
   selectedInputChannelId = parseInt(selectedValue);
-  console.log(`Channel selected from dropdown: ID=${selectedInputChannelId}, value="${selectedValue}"`);
 
   const selectedOption = selector.options[selector.selectedIndex];
   const channelName = selectedOption.textContent || "";

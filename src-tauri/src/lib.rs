@@ -534,26 +534,10 @@ async fn upload_photo_create_schema(
         category: None,
     };
     
-    // Serialize to JSON to see what's actually being sent
-    let json_body = serde_json::to_string_pretty(&request_body)
-        .unwrap_or_else(|e| format!("Failed to serialize: {}", e));
-    
-    // Truncate large base64 fields for readability
-    let json_preview = if json_body.len() > 5000 {
-        let mut lines: Vec<&str> = json_body.lines().collect();
-        for line in lines.iter_mut() {
-            if line.contains("base64") && line.len() > 100 {
-                *line = "    \"..._base64\": \"[TRUNCATED]\"";
-            }
-        }
-        lines.join("\n")
-    } else {
-        json_body.clone()
-    };
-    
-    println!("=== ACTUAL JSON BEING SENT TO BACKEND ===");
-    println!("{}", json_preview);
-    println!("=== END JSON ===");
+    // Log upload
+    println!("Uploading photo (hothash: {}) to channel {}", 
+             request_body.photo_create_schema.hothash, 
+             input_channel_id);
     
     let response = client
         .post(format!("{}/api/v1/photos/create", backend_url))
