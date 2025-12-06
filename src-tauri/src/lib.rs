@@ -78,6 +78,20 @@ pub struct PhotoCreateSchema {
     // NEW in v2.x: List of source image files
     #[serde(default)]
     pub image_file_list: Vec<ImageFileSchema>,
+    
+    // Organization fields (added by desktop before upload)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_channel_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rating: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub visibility: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stack_id: Option<i32>,
 }
 
 // ImageFile schema from imalink-core response
@@ -113,6 +127,12 @@ impl Default for PhotoCreateSchema {
             gps_longitude: None,
             exif_dict: serde_json::Value::Object(serde_json::Map::new()),
             image_file_list: Vec::new(),
+            input_channel_id: None,
+            rating: None,
+            visibility: None,
+            category: None,
+            author_id: None,
+            stack_id: None,
         }
     }
 }
@@ -514,9 +534,14 @@ async fn upload_photo_create_schema(
         category: None,
     };
     
-    // Log what we're sending to backend
-    println!("Uploading photo to input_channel_id: {}", input_channel_id);
-    println!("Request body input_channel_id: {:?}", request_body.input_channel_id);
+    // Log complete request for debugging
+    println!("=== UPLOAD REQUEST DEBUG ===");
+    println!("input_channel_id param: {}", input_channel_id);
+    println!("request_body.input_channel_id: {:?}", request_body.input_channel_id);
+    println!("photo_create_schema.input_channel_id: {:?}", request_body.photo_create_schema.input_channel_id);
+    println!("photo_create_schema.hothash: {}", request_body.photo_create_schema.hothash);
+    println!("image_file_list count: {}", request_body.photo_create_schema.image_file_list.len());
+    println!("=== END REQUEST DEBUG ===");
     
     let response = client
         .post(format!("{}/api/v1/photos/create", backend_url))
