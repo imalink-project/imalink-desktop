@@ -57,6 +57,14 @@ interface PhotoCreateSchema {
   
   // NEW in v2.x: List of source image files
   image_file_list?: ImageFileSchema[];
+  
+  // Organization fields (set by desktop before upload)
+  input_channel_id?: number | null;
+  rating?: number;
+  visibility?: string;
+  category?: string | null;
+  author_id?: number | null;
+  stack_id?: number | null;
 }
 
 interface ImageFileSchema {
@@ -487,11 +495,19 @@ async function startImport() {
           });
         }
         
-        // Step 3f: Upload complete PhotoCreateSchema to backend
+        // Step 3f: Add input_channel_id to PhotoCreateSchema
+        photoCreateSchema.input_channel_id = inputChannelId;
+        
+        // Upload complete PhotoCreateSchema to backend
         console.log(`Uploading PhotoCreateSchema for ${masterFileName} with ${photoCreateSchema.image_file_list.length} file(s)`);
         console.log(`Using input_channel_id: ${inputChannelId}`);
-        console.log('=== FULL PhotoCreateSchema ===');
-        console.log(JSON.stringify(photoCreateSchema, null, 2));
+        
+        // Debug: Print schema without large base64 fields
+        const debugSchema = { ...photoCreateSchema };
+        if (debugSchema.hotpreview_base64) debugSchema.hotpreview_base64 = `[${debugSchema.hotpreview_base64.length} chars]`;
+        if (debugSchema.coldpreview_base64) debugSchema.coldpreview_base64 = `[${debugSchema.coldpreview_base64?.length || 0} chars]`;
+        console.log('=== PhotoCreateSchema (previews truncated) ===');
+        console.log(JSON.stringify(debugSchema, null, 2));
         console.log('=== END PhotoCreateSchema ===');
         
         const uploadResult: PhotoCreateResponse = await invoke("upload_photo_create_schema", {
