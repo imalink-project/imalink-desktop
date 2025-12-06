@@ -118,71 +118,59 @@ let selectedFiles: string[] = [];
 let selectedDirPath: string | null = null;
 let selectedInputChannelId: number | null = null;
 
-async function selectDirectory() {
+async function scanDirectory(dirPath: string) {
   const statusEl = document.querySelector("#status");
-  const selectedDirEl = document.querySelector("#selected-dir");
   const fileListEl = document.querySelector("#file-list") as HTMLElement;
   const filesEl = document.querySelector("#files");
   const startImportBtn = document.querySelector("#start-import") as HTMLButtonElement;
   
   try {
-    const dir = await open({
-      multiple: false,
-      directory: true
+    if (statusEl) {
+      statusEl.textContent = "Skanner katalog...";
+      statusEl.className = "loading";
+    }
+    
+    // Scan directory for image files
+    selectedFiles = await invoke("scan_directory", {
+      dirPath: dirPath
     });
-
-    if (dir) {
-      selectedDirPath = dir as string;
-      if (selectedDirEl) {
-        selectedDirEl.textContent = `Valgt: ${selectedDirPath}`;
-      }
-      if (statusEl) {
-        statusEl.textContent = "Skanner katalog...";
-        statusEl.className = "loading";
-      }
+    
+    // Group files to detect companions
+    const companionGroups = groupCompanionFiles(selectedFiles);
+    const totalFiles = companionGroups.reduce((sum, g) => sum + g.allFiles.length, 0);
+    
+    if (filesEl) {
+      filesEl.innerHTML = `<p>Funnet ${totalFiles} bildefiler i ${companionGroups.length} grupper</p>`;
       
-      // Scan directory for JPEG files
-      selectedFiles = await invoke("scan_directory", {
-        dirPath: selectedDirPath
-      });
-      
-      // Group files to detect companions
-      const companionGroups = groupCompanionFiles(selectedFiles);
-      const totalFiles = companionGroups.reduce((sum, g) => sum + g.allFiles.length, 0);
-      
-      if (filesEl) {
-        filesEl.innerHTML = `<p>Funnet ${totalFiles} bildefiler i ${companionGroups.length} grupper</p>`;
-        
-        if (companionGroups.length > 0) {
-          const groupList = companionGroups.slice(0, 10).map(g => {
-            const basename = g.basename;
-            const fileCount = g.allFiles.length;
-            const fileNames = g.allFiles.map(f => f.split('/').pop()).join(', ');
-            return `<li><strong>${basename}</strong> (${fileCount} fil${fileCount > 1 ? 'er' : ''}): ${fileNames}</li>`;
-          }).join('');
-          filesEl.innerHTML += `<ul>${groupList}${companionGroups.length > 10 ? `<li>... og ${companionGroups.length - 10} flere grupper</li>` : ''}</ul>`;
-        }
+      if (companionGroups.length > 0) {
+        const groupList = companionGroups.slice(0, 10).map(g => {
+          const basename = g.basename;
+          const fileCount = g.allFiles.length;
+          const fileNames = g.allFiles.map(f => f.split('/').pop()).join(', ');
+          return `<li><strong>${basename}</strong> (${fileCount} fil${fileCount > 1 ? 'er' : ''}): ${fileNames}</li>`;
+        }).join('');
+        filesEl.innerHTML += `<ul>${groupList}${companionGroups.length > 10 ? `<li>... og ${companionGroups.length - 10} flere grupper</li>` : ''}</ul>`;
       }
-      
-      if (fileListEl) {
-        fileListEl.style.display = selectedFiles.length > 0 ? "block" : "none";
-      }
-      
-      if (startImportBtn) {
-        startImportBtn.disabled = selectedFiles.length === 0;
-      }
-      
-      if (statusEl) {
-        statusEl.textContent = selectedFiles.length > 0 ? `✓ Funnet ${totalFiles} filer i ${companionGroups.length} grupper` : "Ingen bildefiler funnet";
-        statusEl.className = selectedFiles.length > 0 ? "success" : "error";
-      }
+    }
+    
+    if (fileListEl) {
+      fileListEl.style.display = selectedFiles.length > 0 ? "block" : "none";
+    }
+    
+    if (startImportBtn) {
+      startImportBtn.disabled = selectedFiles.length === 0;
+    }
+    
+    if (statusEl) {
+      statusEl.textContent = selectedFiles.length > 0 ? `✓ Funnet ${totalFiles} filer i ${companionGroups.length} grupper` : "Ingen bildefiler funnet";
+      statusEl.className = selectedFiles.length > 0 ? "success" : "error";
     }
   } catch (error) {
     if (statusEl) {
-      statusEl.textContent = `Feil ved katalogvalg: ${error}`;
+      statusEl.textContent = `Feil ved skanning: ${error}`;
       statusEl.className = "error";
     }
-    console.error("Failed to select directory:", error);
+    console.error("Failed to scan directory:", error);
   }
 }
 
@@ -945,17 +933,61 @@ async function createNewChannel() {
 
 function handleImportModeChange() {
   const copyRadio = document.querySelector('input[name="import-mode"][value="copy"]') as HTMLInputElement;
-  const copyDestinationDiv = document.querySelector("#copy-destination") as HTMLElement;
-  const registerInfoDiv = document.querySelector("#register-info") as HTMLElement;
+  const copySettingsDiv = document.querySelector("#copy-settings") as HTMLElement;
+  const registerSourceDiv = document.querySelector("#register-source") as HTMLElement;
   
   const isCopyMode = copyRadio?.checked || false;
   
-  if (copyDestinationDiv) {
-    copyDestinationDiv.style.display = isCopyMode ? "block" : "none";
+  if (copySettingsDiv) {
+    copySettingsDiv.style.display = isCopyMode ? "block" : "none";
   }
   
-  if (registerInfoDiv) {
-    registerInfoDiv.style.display = isCopyMode ? "none" : "block";
+  if (registerSourceDiv) {
+    registerSourceDiv.style.display = isCopyMode ? "none" : "block";
+  }
+}
+
+async function selectRegisterSourceDirectory() {
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: true,
+      title: "Velg katalog med bilder (permanent lokasjon)"
+    });
+    
+    if (selected) {
+      const input = document.querySelector("#register-source-path") as HTMLInputElement;
+      if (input) {
+        input.value = selected as string;
+      }
+      // Auto-trigger directory scanning
+      selectedDirPath = selected as string;
+      await scanDirectory(selectedDirPath);
+    }
+  } catch (error) {
+    console.error("Failed to select register source directory:", error);
+  }
+}
+
+async function selectCopySourceDirectory() {
+  try {
+    const selected = await open({
+      multiple: false,
+      directory: true,
+      title: "Velg kildekatalog (midlertidig lokasjon)"
+    });
+    
+    if (selected) {
+      const input = document.querySelector("#copy-source-path") as HTMLInputElement;
+      if (input) {
+        input.value = selected as string;
+      }
+      // Auto-trigger directory scanning
+      selectedDirPath = selected as string;
+      await scanDirectory(selectedDirPath);
+    }
+  } catch (error) {
+    console.error("Failed to select copy source directory:", error);
   }
 }
 
@@ -964,7 +996,7 @@ async function selectDestinationDirectory() {
     const selected = await open({
       multiple: false,
       directory: true,
-      title: "Velg destinasjonskatalog for kopiering"
+      title: "Velg destinasjonskatalog (permanent lagring)"
     });
     
     if (selected) {
@@ -1009,7 +1041,6 @@ window.addEventListener("DOMContentLoaded", () => {
   initializeAuth();
   
   // Main screen event listeners
-  const selectDirBtn = document.querySelector("#select-dir");
   const startImportBtn = document.querySelector("#start-import");
   const openGalleryBtn = document.querySelector("#open-gallery-btn");
   const logoutBtn = document.querySelector("#logout-btn");
@@ -1020,7 +1051,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const createChannelBtn = document.querySelector("#create-channel-btn");
   const existingChannelsSelect = document.querySelector("#existing-channels");
   
-  selectDirBtn?.addEventListener("click", selectDirectory);
+  // Remove old select-dir button - replaced by mode-specific buttons
   startImportBtn?.addEventListener("click", startImport);
   openGalleryBtn?.addEventListener("click", openWebGallery);
   logoutBtn?.addEventListener("click", handleLogout);
@@ -1032,11 +1063,15 @@ window.addEventListener("DOMContentLoaded", () => {
   
   // Import mode event listeners
   const importModeRadios = document.querySelectorAll('input[name="import-mode"]');
+  const selectRegisterSourceBtn = document.querySelector("#select-register-source-btn");
+  const selectCopySourceBtn = document.querySelector("#select-copy-source-btn");
   const selectDestinationBtn = document.querySelector("#select-destination-btn");
   
   importModeRadios.forEach(radio => {
     radio.addEventListener("change", handleImportModeChange);
   });
+  selectRegisterSourceBtn?.addEventListener("click", selectRegisterSourceDirectory);
+  selectCopySourceBtn?.addEventListener("click", selectCopySourceDirectory);
   selectDestinationBtn?.addEventListener("click", selectDestinationDirectory);
   
   // Initialize import mode UI

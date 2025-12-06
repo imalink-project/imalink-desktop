@@ -178,51 +178,77 @@
         <div class="section">
           <h2>3. Import-modus</h2>
           <div class="controls">
-            <label>Velg hvordan filer skal håndteres:</label>
-            <div style="margin: 15px 0;">
-              <label style="display: block; margin-bottom: 10px;">
+            <label style="font-weight: bold; display: block; margin-bottom: 15px;">Velg hvordan filer skal håndteres:</label>
+            
+            <!-- REGISTER MODE (default) -->
+            <div style="margin-bottom: 20px; padding: 15px; border: 2px solid #2196F3; border-radius: 8px; background: #E3F2FD;">
+              <label style="display: block; cursor: pointer;">
                 <input type="radio" name="import-mode" value="register" checked>
-                <strong>Registrer på eksisterende lokasjon</strong> (f.eks. NAS, arkiv)
-                <p style="margin: 5px 0 0 25px; color: #666; font-size: 0.9em;">
-                  Filer blir værende der de er. Ingen kopiering.
-                </p>
+                <strong style="font-size: 1.1em;">📁 Registrer fra nåværende lokasjon</strong>
               </label>
-              <label style="display: block;">
-                <input type="radio" name="import-mode" value="copy">
-                <strong>Kopier fra midlertidig lokasjon</strong> (f.eks. SD-kort)
-                <p style="margin: 5px 0 0 25px; color: #666; font-size: 0.9em;">
-                  Filer kopieres til permanent lagring. Velg destinasjonskatalog nedenfor.
-                </p>
-              </label>
-            </div>
-
-            <div id="copy-destination" style="margin-top: 15px;">
-              <label for="destination-path">Destinasjonskatalog:</label>
-              <div style="display: flex; gap: 10px; align-items: center;">
-                <input 
-                  type="text" 
-                  id="destination-path" 
-                  placeholder="/home/user/photos/2025"
-                  style="flex: 1;"
-                  readonly
-                />
-                <button id="select-destination-btn" type="button">Velg katalog...</button>
+              <p style="margin: 10px 0 15px 25px; color: #333; line-height: 1.5;">
+                Brukes for bilder som allerede ligger på permanent lagring (NAS, harddisk, arkiv).<br>
+                Ingen filer kopieres - de blir værende der de er.
+              </p>
+              <div id="register-source" style="margin-left: 25px;">
+                <label for="register-source-path" style="display: block; margin-bottom: 5px; font-weight: bold;">Velg katalog med bilder:</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <input 
+                    type="text" 
+                    id="register-source-path" 
+                    placeholder="/mnt/nas/photos/2025"
+                    style="flex: 1; padding: 8px;"
+                    readonly
+                  />
+                  <button id="select-register-source-btn" type="button" style="padding: 8px 15px;">Velg katalog...</button>
+                </div>
               </div>
-              <p class="info-text">💾 Velg hvor filene skal kopieres til</p>
             </div>
 
-            <div id="register-info" style="display: none; margin-top: 15px; padding: 10px; background: #e3f2fd; border-radius: 4px;">
-              <p style="margin: 0;"><strong>📁 Register-modus:</strong> Filer blir værende på sin nåværende lokasjon. Sørg for at lagringen er permanent (ikke SD-kort).</p>
+            <!-- COPY MODE -->
+            <div style="padding: 15px; border: 2px solid #ccc; border-radius: 8px; background: #f5f5f5;">
+              <label style="display: block; cursor: pointer;">
+                <input type="radio" name="import-mode" value="copy">
+                <strong style="font-size: 1.1em;">💾 Kopier fra midlertidig lokasjon</strong>
+              </label>
+              <p style="margin: 10px 0 15px 25px; color: #666; line-height: 1.5;">
+                Brukes for bilder på SD-kort, USB-stick eller annen midlertidig lagring.<br>
+                Filene kopieres til permanent destinasjon.
+              </p>
+              <div id="copy-settings" style="margin-left: 25px; display: none;">
+                <div style="margin-bottom: 15px;">
+                  <label for="copy-source-path" style="display: block; margin-bottom: 5px; font-weight: bold;">Kilde (midlertidig):</label>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <input 
+                      type="text" 
+                      id="copy-source-path" 
+                      placeholder="/media/kjell/SD-CARD"
+                      style="flex: 1; padding: 8px;"
+                      readonly
+                    />
+                    <button id="select-copy-source-btn" type="button" style="padding: 8px 15px;">Velg katalog...</button>
+                  </div>
+                </div>
+                <div>
+                  <label for="destination-path" style="display: block; margin-bottom: 5px; font-weight: bold;">Destinasjon (permanent):</label>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <input 
+                      type="text" 
+                      id="destination-path" 
+                      placeholder="/home/kjell/photos/2025"
+                      style="flex: 1; padding: 8px;"
+                      readonly
+                    />
+                    <button id="select-destination-btn" type="button" style="padding: 8px 15px;">Velg katalog...</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
         <div class="section">
-          <h2>4. Velg Katalog</h2>
-          <div class="controls">
-            <button id="select-dir">Velg katalog med bilder</button>
-            <span id="selected-dir"></span>
-          </div>
+          <h2>4. Filinfo</h2>
           <div id="file-list" style="display: none;">
             <h3>Funnet filer:</h3>
             <div id="files"></div>
