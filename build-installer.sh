@@ -18,12 +18,12 @@ cd ../imalink-core
 
 # Check if PyInstaller is installed
 if ! command -v pyinstaller &> /dev/null; then
-    echo "Installing PyInstaller..."
-    pip install pyinstaller
+    echo "Installing PyInstaller with uv..."
+    uv pip install pyinstaller
 fi
 
 # Build imalink-core as standalone executable
-pyinstaller --onefile \
+uv run pyinstaller --onefile \
     --name imalink-core \
     --add-data "src:src" \
     service/main.py
@@ -31,17 +31,42 @@ pyinstaller --onefile \
 echo "✓ imalink-core executable built"
 echo ""
 
-# Step 2: Copy to desktop binaries folder
+# Step 2: Copy to desktop binaries folder with platform suffix
 echo "Step 2: Copying imalink-core to desktop resources..."
 cd ../imalink-desktop
 mkdir -p src-tauri/binaries
 
+# Detect platform and set appropriate binary name
+PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
+ARCH=$(uname -m)
+
+case "$PLATFORM" in
+    linux)
+        TARGET="x86_64-unknown-linux-gnu"
+        BINARY_EXT=""
+        ;;
+    darwin)
+        TARGET="aarch64-apple-darwin"  # or x86_64-apple-darwin
+        BINARY_EXT=""
+        ;;
+    mingw*|msys*|cygwin*)
+        TARGET="x86_64-pc-windows-msvc"
+        BINARY_EXT=".exe"
+        ;;
+    *)
+        echo "Unsupported platform: $PLATFORM"
+        exit 1
+        ;;
+esac
+
+DEST_NAME="imalink-core-${TARGET}${BINARY_EXT}"
+
 if [ -f "../imalink-core/dist/imalink-core" ]; then
-    cp ../imalink-core/dist/imalink-core src-tauri/binaries/
-    chmod +x src-tauri/binaries/imalink-core
-    echo "✓ Copied imalink-core to src-tauri/binaries/"
+    cp "../imalink-core/dist/imalink-core" "src-tauri/binaries/${DEST_NAME}"
+    chmod +x "src-tauri/binaries/${DEST_NAME}"
+    echo "✓ Copied imalink-core to src-tauri/binaries/${DEST_NAME}"
 else
-    echo "Error: imalink-core executable not found"
+    echo "Error: imalink-core executable not found at ../imalink-core/dist/imalink-core"
     exit 1
 fi
 echo ""

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
-use tauri::{WebviewUrl, WebviewWindowBuilder, Manager};
+use tauri::{WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::ShellExt;
 
 // ===== Authentication Structures =====
@@ -774,8 +774,14 @@ async fn start_core_server(app: tauri::AppHandle) -> Result<(), String> {
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
-                CommandEvent::Stdout(line) => println!("[imalink-core] {}", line),
-                CommandEvent::Stderr(line) => eprintln!("[imalink-core] {}", line),
+                CommandEvent::Stdout(line) => {
+                    let output = String::from_utf8_lossy(&line);
+                    println!("[imalink-core] {}", output);
+                }
+                CommandEvent::Stderr(line) => {
+                    let output = String::from_utf8_lossy(&line);
+                    eprintln!("[imalink-core] {}", output);
+                }
                 CommandEvent::Terminated(payload) => {
                     println!("[imalink-core] Terminated with code: {:?}", payload.code);
                     break;

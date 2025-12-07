@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# PyInstaller artifacts (from imalink-core build)
+*.spec
+build/
+dist/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
