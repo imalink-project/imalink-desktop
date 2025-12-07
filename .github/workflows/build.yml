@@ -78,8 +78,30 @@ jobs:
         shell: bash
         run: |
           uv venv
-          uv pip install --system pyinstaller
-          uv run pyinstaller --onefile --name imalink-core --add-data "src:src" service/main.py
+          # Install imalink-core dependencies first
+          uv pip install -r requirements.txt
+          # Install PyInstaller
+          uv pip install pyinstaller
+          # Build with PyInstaller - include all hidden imports
+          uv run pyinstaller --onefile --name imalink-core \
+            --hidden-import=fastapi \
+            --hidden-import=uvicorn \
+            --hidden-import=uvicorn.logging \
+            --hidden-import=uvicorn.loops \
+            --hidden-import=uvicorn.loops.auto \
+            --hidden-import=uvicorn.protocols \
+            --hidden-import=uvicorn.protocols.http \
+            --hidden-import=uvicorn.protocols.http.auto \
+            --hidden-import=uvicorn.protocols.websockets \
+            --hidden-import=uvicorn.protocols.websockets.auto \
+            --hidden-import=uvicorn.lifespan \
+            --hidden-import=uvicorn.lifespan.on \
+            --hidden-import=PIL \
+            --hidden-import=PIL._imaging \
+            --collect-all=fastapi \
+            --collect-all=uvicorn \
+            --collect-all=starlette \
+            service/main.py
 
       - name: Copy imalink-core binary to desktop (Linux/macOS)
         if: matrix.os_name != 'windows'
