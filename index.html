@@ -124,13 +124,17 @@
           <h2>1. API Konfiguration</h2>
           <div class="controls">
             <label for="core-url">imalink-core API URL:</label>
-            <input 
-              type="text" 
-              id="core-url" 
-              value="http://localhost:8765" 
-              placeholder="http://localhost:8765"
-            />
-            <p class="info-text">⚠️ imalink-core må kjøre lokalt på port 8765. Start med: <code>uv run imalink-core</code></p>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input 
+                type="text" 
+                id="core-url" 
+                value="http://localhost:8765" 
+                placeholder="http://localhost:8765"
+                style="flex: 1;"
+              />
+              <button id="test-core-btn" type="button">Test tilkobling</button>
+            </div>
+            <p id="core-status" class="info-text">imalink-core startes automatisk ved oppstart av appen</p>
           </div>
         </div>
 

@@ -749,6 +749,7 @@ pub fn run() {
             register,
             logout,
             validate_token,
+            check_core_health,
             open_web_gallery
         ])
         .run(tauri::generate_context!())
@@ -760,42 +761,94 @@ pub fn run() {
 async fn start_core_server(app: tauri::AppHandle) -> Result<(), String> {
     use tauri_plugin_shell::process::CommandEvent;
     
-    println!("Starting imalink-core server...");
+    println!("Starting imalink-core server on port 8765...");
     
     let sidecar_command = app.shell()
         .sidecar("imalink-core")
-        .map_err(|e| format!("Failed to create sidecar command: {}", e))?;
+        .map_err(|e| {
+            let err_msg = format!("Failed to create sidecar command: {}", e);
+            eprintln!("{}", err_msg);
+            err_msg
+        })?;
     
-    let (mut rx, _child) = sidecar_command
+    println!("Spawning imalink-core process...");
+    let (mut rx, child) = sidecar_command
         .spawn()
-        .map_err(|e| format!("Failed to spawn imalink-core: {}", e))?;
+        .map_err(|e| {
+            let err_msg = format!("Failed to spawn imalink-core: {}", e);
+            eprintln!("{}", err_msg);
+            err_msg
+        })?;
+    
+    println!("imalink-core process spawned with PID: {:?}", child.pid());
     
     // Listen to core output in background
     tauri::async_runtime::spawn(async move {
+        println!("Starting imalink-core output listener...");
         while let Some(event) = rx.recv().await {
             match event {
                 CommandEvent::Stdout(line) => {
                     let output = String::from_utf8_lossy(&line);
-                    println!("[imalink-core] {}", output);
+                    println!("[imalink-core stdout] {}", output);
                 }
                 CommandEvent::Stderr(line) => {
                     let output = String::from_utf8_lossy(&line);
-                    eprintln!("[imalink-core] {}", output);
+                    eprintln!("[imalink-core stderr] {}", output);
                 }
                 CommandEvent::Terminated(payload) => {
-                    println!("[imalink-core] Terminated with code: {:?}", payload.code);
+                    eprintln!("[imalink-core] Process terminated with code: {:?}", payload.code);
+                    if let Some(code) = payload.code {
+                        if code != 0 {
+                            eprintln!("[imalink-core] Non-zero exit code indicates error!");
+                        }
+                    }
                     break;
+                }
+                CommandEvent::Error(err) => {
+                    eprintln!("[imalink-core] Process error: {}", err);
                 }
                 _ => {}
             }
         }
+        println!("imalink-core output listener terminated");
     });
     
-    println!("✓ imalink-core server started");
+    println!("✓ imalink-core server started successfully on http://localhost:8765");
     Ok(())
 }
 
 // ===== Web Gallery Integration =====
+
+#[tauri::command]
+async fn check_core_health(core_api_url: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let health_url = format!("{}/health", core_api_url);
+    
+    println!("Checking imalink-core health at: {}", health_url);
+    
+    match client.get(&health_url).send().await {
+        Ok(response) => {
+            let status = response.status();
+            println!("Health check response status: {}", status);
+            
+            if status.is_success() {
+                match response.text().await {
+                    Ok(body) => {
+                        println!("Health check response body: {}", body);
+                        Ok(format!("✓ imalink-core is running ({})", body))
+                    }
+                    Err(e) => Err(format!("Failed to read response: {}", e))
+                }
+            } else {
+                Err(format!("Health check failed with status: {}", status))
+            }
+        }
+        Err(e) => {
+            eprintln!("Health check request failed: {}", e);
+            Err(format!("Cannot connect to imalink-core at {}: {}", core_api_url, e))
+        }
+    }
+}
 
 #[tauri::command]
 async fn open_web_gallery(app: tauri::AppHandle, token: Option<String>) -> Result<(), String> {

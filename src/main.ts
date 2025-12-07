@@ -607,6 +607,32 @@ async function startImport() {
 
 // ===== Authentication Functions =====
 
+async function checkCoreHealth() {
+  const coreUrlInput = document.querySelector("#core-url") as HTMLInputElement;
+  const coreStatus = document.querySelector("#core-status");
+  const coreApiUrl = coreUrlInput?.value || "http://localhost:8765";
+  
+  if (coreStatus) {
+    coreStatus.textContent = "Tester tilkobling til imalink-core...";
+    coreStatus.className = "info-text loading";
+  }
+  
+  try {
+    const result: string = await invoke("check_core_health", { coreApiUrl });
+    if (coreStatus) {
+      coreStatus.textContent = result;
+      coreStatus.className = "info-text success";
+    }
+    console.log("Core health check passed:", result);
+  } catch (error) {
+    if (coreStatus) {
+      coreStatus.textContent = `❌ ${error}`;
+      coreStatus.className = "info-text error";
+    }
+    console.error("Core health check failed:", error);
+  }
+}
+
 async function initializeAuth() {
   try {
     // Initialize store
@@ -625,6 +651,9 @@ async function initializeAuth() {
         });
         authToken = savedToken;
         showMainScreen();
+        
+        // Check core health after showing main screen
+        setTimeout(checkCoreHealth, 1000);
       } catch {
         // Token invalid, show login
         showLoginScreen();
@@ -1044,6 +1073,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const startImportBtn = document.querySelector("#start-import");
   const openGalleryBtn = document.querySelector("#open-gallery-btn");
   const logoutBtn = document.querySelector("#logout-btn");
+  const testCoreBtn = document.querySelector("#test-core-btn");
   
   // Input channel event listeners
   const loadChannelsBtn = document.querySelector("#load-channels-btn");
@@ -1055,6 +1085,7 @@ window.addEventListener("DOMContentLoaded", () => {
   startImportBtn?.addEventListener("click", startImport);
   openGalleryBtn?.addEventListener("click", openWebGallery);
   logoutBtn?.addEventListener("click", handleLogout);
+  testCoreBtn?.addEventListener("click", checkCoreHealth);
   
   loadChannelsBtn?.addEventListener("click", loadInputChannels);
   showCreateChannelBtn?.addEventListener("click", showCreateChannelForm);
