@@ -77,7 +77,8 @@ jobs:
         working-directory: imalink-core
         shell: bash
         run: |
-          uv pip install pyinstaller
+          uv venv
+          uv pip install --system pyinstaller
           uv run pyinstaller --onefile --name imalink-core --add-data "src:src" service/main.py
 
       - name: Copy imalink-core binary to desktop (Linux/macOS)
