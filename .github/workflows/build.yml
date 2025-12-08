@@ -78,8 +78,8 @@ jobs:
         shell: bash
         run: |
           uv venv
-          # Install imalink-core dependencies first
-          uv pip install -r requirements.txt
+          # Install imalink-core dependencies directly
+          uv pip install fastapi uvicorn pillow python-multipart
           # Install PyInstaller
           uv pip install pyinstaller
           # Build with PyInstaller - include all hidden imports
