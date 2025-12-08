@@ -177,12 +177,20 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Display artifact structure
+        run: ls -R artifacts/
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -195,5 +203,37 @@ jobs:
             artifacts/**/*.dmg
           draft: false
           prerelease: false
+          generate_release_notes: true
+          body: |
+            ## 📥 Last ned installer
+            
+            Velg riktig versjon for ditt operativsystem:
+            
+            - **Windows:** `imalink-desktop_*_x64_en-US.msi` (Windows 10/11, 64-bit)
+            - **macOS:** `imalink-desktop_*_x64.dmg` (macOS 11+, Intel & Apple Silicon)
+            - **Linux:** `imalink-desktop_*_amd64.deb` (Debian/Ubuntu, 64-bit)
+            - **Linux (AppImage):** `imalink-desktop_*_amd64.AppImage` (Universal Linux binary)
+            
+            ## 🚀 Hva er nytt
+            
+            Se automatisk genererte release notes nedenfor for detaljer om endringer siden forrige versjon.
+            
+            ## 📖 Dokumentasjon
+            
+            - [Installasjonsveiledning](https://github.com/imalink-project/imalink-desktop/blob/main/landing-page.html)
+            - [GitHub Repository](https://github.com/imalink-project/imalink-desktop)
+            - [Webgalleri](https://imalink.trollfjell.com)
+            
+            ## ⚠️ Status
+            
+            Dette er en **Proof of Concept (PoC)** versjon. Grunnleggende funksjonalitet fungerer, men applikasjonen er ikke produksjonsklar.
+            
+            ## 🔧 Systemkrav
+            
+            - **Windows:** Windows 10/11 (64-bit)
+            - **macOS:** macOS 11 Big Sur eller nyere
+            - **Linux:** Ubuntu 22.04+ / Debian 11+ (eller kompatibel)
+            - **RAM:** 4 GB minimum (8 GB anbefalt)
+            - **Diskplass:** 200 MB + plass til bilder
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

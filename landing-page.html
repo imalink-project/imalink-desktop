@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Imalink Desktop - Fotoadministrasjon for entusiaster</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    header {
+      text-align: center;
+      padding: 60px 20px;
+      color: white;
+    }
+    
+    header h1 {
+      font-size: 3.5rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    header p {
+      font-size: 1.3rem;
+      opacity: 0.95;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    
+    .main-content {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      overflow: hidden;
+      margin-bottom: 40px;
+    }
+    
+    .section {
+      padding: 50px 60px;
+    }
+    
+    .section:nth-child(even) {
+      background: #f8f9fa;
+    }
+    
+    .section h2 {
+      font-size: 2rem;
+      margin-bottom: 25px;
+      color: #667eea;
+    }
+    
+    .section h3 {
+      font-size: 1.5rem;
+      margin: 30px 0 15px;
+      color: #555;
+    }
+    
+    .section p, .section ul {
+      font-size: 1.1rem;
+      color: #555;
+      margin-bottom: 15px;
+    }
+    
+    .section ul {
+      margin-left: 25px;
+    }
+    
+    .section li {
+      margin-bottom: 10px;
+    }
+    
+    .download-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      text-align: center;
+    }
+    
+    .download-section h2 {
+      color: white;
+    }
+    
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 25px;
+      margin-top: 40px;
+    }
+    
+    .download-card {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 30px;
+      transition: transform 0.3s ease, background 0.3s ease;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .download-card:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.25);
+    }
+    
+    .download-card h3 {
+      color: white;
+      font-size: 1.8rem;
+      margin-bottom: 15px;
+    }
+    
+    .download-card p {
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+    }
+    
+    .download-btn {
+      display: inline-block;
+      background: white;
+      color: #667eea;
+      padding: 12px 30px;
+      border-radius: 50px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    
+    .download-btn:hover {
+      background: #f0f0f0;
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+    
+    .version-info {
+      margin-top: 30px;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 30px;
+      margin-top: 30px;
+    }
+    
+    .feature-card {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      border-left: 4px solid #667eea;
+    }
+    
+    .feature-card h3 {
+      color: #667eea;
+      margin-bottom: 10px;
+      margin-top: 0;
+    }
+    
+    .architecture {
+      background: #f8f9fa;
+      border-radius: 10px;
+      padding: 25px;
+      margin: 25px 0;
+    }
+    
+    .architecture h4 {
+      color: #667eea;
+      margin-bottom: 15px;
+      font-size: 1.2rem;
+    }
+    
+    .architecture ul {
+      margin-left: 20px;
+    }
+    
+    .requirements {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 20px;
+      border-radius: 5px;
+      margin: 20px 0;
+    }
+    
+    .requirements h3 {
+      color: #856404;
+      margin-top: 0;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 30px;
+      color: white;
+      font-size: 0.9rem;
+    }
+    
+    footer a {
+      color: white;
+      text-decoration: underline;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      background: #ffc107;
+      color: #333;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin: 10px 0;
+    }
+    
+    @media (max-width: 768px) {
+      header h1 {
+        font-size: 2.5rem;
+      }
+      
+      header p {
+        font-size: 1.1rem;
+      }
+      
+      .section {
+        padding: 30px 25px;
+      }
+      
+      .download-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🖼️ Imalink Desktop</h1>
+      <p>Profesjonell fotoadministrasjon med lokal filsystemtilgang og intelligent metadata-håndtering</p>
+      <span class="status-badge">⚠️ Proof of Concept</span>
+    </header>
+    
+    <div class="main-content">
+      <!-- Download Section -->
+      <section class="section download-section">
+        <h2>📥 Last ned installer</h2>
+        <p>Velg riktig versjon for ditt operativsystem</p>
+        
+        <div class="download-grid">
+          <div class="download-card">
+            <h3>🪟 Windows</h3>
+            <p>Windows 10/11 (64-bit)<br>MSI installer</p>
+            <a href="https://github.com/imalink-project/imalink-desktop/releases/latest/download/imalink-desktop_0.1.0_x64_en-US.msi" class="download-btn">Last ned .msi</a>
+          </div>
+          
+          <div class="download-card">
+            <h3>🍎 macOS</h3>
+            <p>macOS 11+ (Intel & Apple Silicon)<br>DMG disk image</p>
+            <a href="https://github.com/imalink-project/imalink-desktop/releases/latest/download/imalink-desktop_0.1.0_x64.dmg" class="download-btn">Last ned .dmg</a>
+          </div>
+          
+          <div class="download-card">
+            <h3>🐧 Linux</h3>
+            <p>Debian/Ubuntu (64-bit)<br>DEB pakke</p>
+            <a href="https://github.com/imalink-project/imalink-desktop/releases/latest/download/imalink-desktop_0.1.0_amd64.deb" class="download-btn">Last ned .deb</a>
+          </div>
+        </div>
+        
+        <div class="version-info">
+          <p><strong>Versjon:</strong> v0.1.0 | <strong>Sist oppdatert:</strong> 8. desember 2025</p>
+          <p><a href="https://github.com/imalink-project/imalink-desktop/releases" style="color: white;">Se alle versjoner →</a></p>
+        </div>
+      </section>
+      
+      <!-- About Section -->
+      <section class="section">
+        <h2>Om Imalink Desktop</h2>
+        <p>Imalink Desktop er en desktopapplikasjon som gir deg full kontroll over dine bildefiler med lokal filsystemtilgang og avansert metadata-ekstraksjon. Perfekt for fotografer som ønsker profesjonell organisering av bildene sine.</p>
+        
+        <div class="features">
+          <div class="feature-card">
+            <h3>🗂️ Lokal filsystemtilgang</h3>
+            <p>Skann mapper direkte på datamaskinen din eller eksterne lagringsenheter. Velg mellom Register-modus (hold filer på plass) eller Copy-modus (kopier til bibliotek).</p>
+          </div>
+          
+          <div class="feature-card">
+            <h3>📸 EXIF metadata-ekstraksjon</h3>
+            <p>Automatisk lesing av EXIF-data fra bildene: kameramodell, objektiv, eksponeringsinnstillinger, GPS-koordinater, dato/tid, og mer.</p>
+          </div>
+          
+          <div class="feature-card">
+            <h3>🔗 Companion file-håndtering</h3>
+            <p>Intelligent gjenkjenning av relaterte filer (JPG + RAW, HEIC + sidecar, etc.). Automatisk gruppering med master/companion-logikk.</p>
+          </div>
+          
+          <div class="feature-card">
+            <h3>🖼️ Preview-generering</h3>
+            <p>Hotpreview (150×150px) og coldpreview (1200px) genereres automatisk for rask visning i webgalleri.</p>
+          </div>
+          
+          <div class="feature-card">
+            <h3>☁️ Synkronisering til sky</h3>
+            <p>Opplasting av metadata og previews til Imalink backend-server for tilgang fra webgalleri.</p>
+          </div>
+          
+          <div class="feature-card">
+            <h3>🔐 Sikker autentisering</h3>
+            <p>Innlogging med bruker/passord, token-basert autentisering, og sikker lagring av credentials.</p>
+          </div>
+        </div>
+      </section>
+      
+      <!-- Architecture Section -->
+      <section class="section">
+        <h2>Arkitektur</h2>
+        <p>Imalink er et modulært system som består av fire hovedkomponenter:</p>
+        
+        <div class="architecture">
+          <h4>🖥️ imalink-desktop (denne applikasjonen)</h4>
+          <ul>
+            <li>Tauri v2 desktop framework (Rust + TypeScript)</li>
+            <li>Lokal filsystemtilgang og UI</li>
+            <li>Kommunikasjon med imalink-core og backend</li>
+            <li>Bundler imalink-core som embedded sidecar-prosess</li>
+          </ul>
+        </div>
+        
+        <div class="architecture">
+          <h4>⚙️ imalink-core (lokal API-server)</h4>
+          <ul>
+            <li>Python FastAPI server (kjører lokalt)</li>
+            <li>EXIF-lesing med Pillow/exifread</li>
+            <li>Preview-generering (hotpreview + coldpreview)</li>
+            <li>Hashing og metadata-ekstraksjon</li>
+          </ul>
+        </div>
+        
+        <div class="architecture">
+          <h4>🌐 imalink-web (webgalleri)</h4>
+          <ul>
+            <li>React-basert webapplikasjon</li>
+            <li>Bildegalleri med avansert søk og filtrering</li>
+            <li>Metadata-visning og organisering</li>
+            <li>Tilgjengelig på <a href="https://imalink.trollfjell.com" target="_blank">imalink.trollfjell.com</a></li>
+          </ul>
+        </div>
+        
+        <div class="architecture">
+          <h4>🔌 imalink (backend API)</h4>
+          <ul>
+            <li>FastAPI backend med PostgreSQL database</li>
+            <li>Brukeradministrasjon og autentisering</li>
+            <li>Lagring av metadata og previews</li>
+            <li>API tilgjengelig på <a href="https://api.trollfjell.com" target="_blank">api.trollfjell.com</a></li>
+          </ul>
+        </div>
+      </section>
+      
+      <!-- Installation Section -->
+      <section class="section">
+        <h2>Installasjon og bruk</h2>
+        
+        <h3>Windows</h3>
+        <ol>
+          <li>Last ned <code>imalink-desktop_0.1.0_x64_en-US.msi</code></li>
+          <li>Dobbeltklikk på filen for å starte installasjonsprosessen</li>
+          <li>Følg installasjonsveiviseren (installer som "Imalink Project")</li>
+          <li>Start Imalink Desktop fra Start-menyen</li>
+        </ol>
+        <p><em>Merk: Windows SmartScreen kan vise en advarsel første gang. Klikk "Mer info" → "Kjør likevel".</em></p>
+        
+        <h3>macOS</h3>
+        <ol>
+          <li>Last ned <code>imalink-desktop_0.1.0_x64.dmg</code></li>
+          <li>Åpne DMG-filen og dra Imalink Desktop til Applications-mappen</li>
+          <li>Første gang du starter appen, høyreklikk → "Åpne" for å godkjenne</li>
+          <li>Logg inn med dine Imalink-credentials</li>
+        </ol>
+        
+        <h3>Linux</h3>
+        <ol>
+          <li>Last ned <code>imalink-desktop_0.1.0_amd64.deb</code></li>
+          <li>Installer med <code>sudo dpkg -i imalink-desktop_0.1.0_amd64.deb</code></li>
+          <li>Start fra applikasjonsmenyen eller kjør <code>imalink-desktop</code> i terminal</li>
+        </ol>
+        <p><em>AppImage-versjon finnes også: <a href="https://github.com/imalink-project/imalink-desktop/releases/latest/download/imalink-desktop_0.1.0_amd64.AppImage">imalink-desktop_0.1.0_amd64.AppImage</a></em></p>
+        
+        <div class="requirements">
+          <h3>⚙️ Systemkrav</h3>
+          <ul>
+            <li><strong>Windows:</strong> Windows 10/11 (64-bit)</li>
+            <li><strong>macOS:</strong> macOS 11 Big Sur eller nyere</li>
+            <li><strong>Linux:</strong> Ubuntu 22.04+ / Debian 11+ (eller kompatibel)</li>
+            <li><strong>Minne:</strong> 4 GB RAM (8 GB anbefalt)</li>
+            <li><strong>Diskplass:</strong> 200 MB for applikasjonen + plass til bildene dine</li>
+            <li><strong>Nettverk:</strong> Internettforbindelse for synkronisering</li>
+          </ul>
+        </div>
+      </section>
+      
+      <!-- Workflow Section -->
+      <section class="section">
+        <h2>Arbeidsflyt</h2>
+        
+        <h3>1. Første gangs oppsett</h3>
+        <ul>
+          <li>Opprett en bruker på <a href="https://imalink.trollfjell.com" target="_blank">imalink.trollfjell.com</a> (eller bruk eksisterende)</li>
+          <li>Start Imalink Desktop og logg inn med dine credentials</li>
+          <li>Verifiser at imalink-core starter (grønn ✓ indikator)</li>
+        </ul>
+        
+        <h3>2. Import av bilder</h3>
+        <ul>
+          <li><strong>Register-modus:</strong> Velg katalog der bildene allerede ligger permanent (arkiv, NAS, etc.)</li>
+          <li><strong>Copy-modus:</strong> Velg kildekatalog (SD-kort, midlertidig mappe) og destinasjonskatalog</li>
+          <li>Opprett eller velg en Input Channel (importøkt)</li>
+          <li>Trykk "Start Import" – appen skanner, grupperer companion-filer, og laster opp</li>
+        </ul>
+        
+        <h3>3. Visning i webgalleri</h3>
+        <ul>
+          <li>Åpne <a href="https://imalink.trollfjell.com" target="_blank">imalink.trollfjell.com</a> i nettleseren</li>
+          <li>Logg inn med samme bruker</li>
+          <li>Se bildene dine med metadata, GPS-plassering, EXIF-info, og mer</li>
+        </ul>
+      </section>
+      
+      <!-- Status Section -->
+      <section class="section">
+        <h2>Prosjektstatus</h2>
+        <p><strong>Dette er en Proof of Concept (PoC)</strong> – grunnleggende funksjonalitet er implementert og testet, men applikasjonen er ikke klar for produksjonsbruk.</p>
+        
+        <h3>✅ Fungerer nå:</h3>
+        <ul>
+          <li>Lokal katalogskanning og companion file-deteksjon</li>
+          <li>EXIF-lesing og metadata-ekstraksjon</li>
+          <li>Preview-generering (hotpreview + coldpreview)</li>
+          <li>Copy/Register import-moduser</li>
+          <li>Opplasting til Imalink backend</li>
+          <li>Duplikatdeteksjon</li>
+          <li>Bundlet imalink-core (ingen manuell installasjon nødvendig)</li>
+          <li>Multi-platform (Windows, macOS, Linux)</li>
+        </ul>
+        
+        <h3>🚧 Ikke implementert ennå:</h3>
+        <ul>
+          <li>Batch-prosessering av store biblioteker</li>
+          <li>Avansert filtrering og sortering</li>
+          <li>Offline-modus med senere synkronisering</li>
+          <li>Automatisk overvåking av mapper</li>
+          <li>RAW-formatstøtte (krever rawpy/libraw)</li>
+          <li>Produksjonsklart bygg med kodesignering</li>
+        </ul>
+      </section>
+      
+      <!-- Links Section -->
+      <section class="section">
+        <h2>Lenker og ressurser</h2>
+        <ul>
+          <li><strong>GitHub Repository:</strong> <a href="https://github.com/imalink-project/imalink-desktop" target="_blank">github.com/imalink-project/imalink-desktop</a></li>
+          <li><strong>Webgalleri:</strong> <a href="https://imalink.trollfjell.com" target="_blank">imalink.trollfjell.com</a></li>
+          <li><strong>Backend API:</strong> <a href="https://api.trollfjell.com" target="_blank">api.trollfjell.com</a></li>
+          <li><strong>imalink-core:</strong> <a href="https://github.com/kjelkols/imalink-core" target="_blank">github.com/kjelkols/imalink-core</a></li>
+          <li><strong>imalink-web:</strong> <a href="https://github.com/kjelkols/imalink-web" target="_blank">github.com/kjelkols/imalink-web</a></li>
+          <li><strong>imalink backend:</strong> <a href="https://github.com/kjelkols/imalink" target="_blank">github.com/kjelkols/imalink</a></li>
+        </ul>
+      </section>
+    </div>
+    
+    <footer>
+      <p>Imalink Project © 2025 | Laget med ❤️ for fotografer</p>
+      <p><a href="https://github.com/imalink-project/imalink-desktop/issues">Rapporter en feil eller foreslå forbedringer</a></p>
+    </footer>
+  </div>
+</body>
+</html>
