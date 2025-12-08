@@ -33,6 +33,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/imalink-core"]
+    "externalBin": ["binaries/imalink-core"],
+    "publisher": "Imalink Project",
+    "copyright": "Copyright © 2025 Imalink Project",
+    "category": "Photography",
+    "shortDescription": "Desktop companion for Imalink photo management",
+    "longDescription": "Imalink Desktop provides local file system access and image processing for the Imalink photo management system."
   }
 }
