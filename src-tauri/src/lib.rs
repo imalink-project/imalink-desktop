@@ -277,7 +277,7 @@ async fn process_image_file(file_path: String, core_api_url: String) -> Result<P
                 .mime_str("image/*")
                 .map_err(|e| format!("Failed to set mime type: {}", e))?,
         )
-        .text("coldpreview_size", "1200"); // Request coldpreview with max 1200px
+        .text("coldpreview_size", "800"); // Request coldpreview with max 800px
 
     let response = client
         .post(format!("{}/v1/process", core_api_url))
@@ -865,7 +865,7 @@ async fn open_web_gallery(app: tauri::AppHandle, token: Option<String>) -> Resul
         WebviewUrl::External(gallery_url.parse().map_err(|e| format!("Invalid URL: {}", e))?)
     )
     .title("Imalink Gallery")
-    .inner_size(1200.0, 800.0)
+    .inner_size(800.0, 800.0)
     .build()
     .map_err(|e| format!("Failed to create gallery window: {}", e))?;
 
