@@ -1,8 +1,20 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::fs;
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use std::sync::Mutex;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::ShellExt;
+
+// Global state to track imalink-core process
+struct CoreProcess {
+    child: Option<tauri_plugin_shell::process::CommandChild>,
+}
+
+impl CoreProcess {
+    fn new() -> Self {
+        CoreProcess { child: None }
+    }
+}
 
 // ===== Authentication Structures =====
 
@@ -726,6 +738,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .manage(Mutex::new(CoreProcess::new()))
         .setup(|app| {
             // Start imalink-core sidecar on app startup
             let app_handle = app.handle().clone();
@@ -735,6 +748,17 @@ pub fn run() {
                 }
             });
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                // Check if this is the last window
+                let app = window.app_handle();
+                let windows = app.webview_windows();
+                if windows.len() <= 1 {
+                    println!("Last window closing, stopping imalink-core...");
+                    stop_core_server(app);
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             greet, 
@@ -782,6 +806,14 @@ async fn start_core_server(app: tauri::AppHandle) -> Result<(), String> {
     
     println!("imalink-core process spawned with PID: {:?}", child.pid());
     
+    // Store child process in global state so we can kill it on exit
+    if let Some(core_state) = app.try_state::<Mutex<CoreProcess>>() {
+        if let Ok(mut state) = core_state.lock() {
+            state.child = Some(child);
+            println!("✓ imalink-core process stored in state");
+        }
+    }
+    
     // Listen to core output in background
     tauri::async_runtime::spawn(async move {
         println!("Starting imalink-core output listener...");
@@ -815,6 +847,20 @@ async fn start_core_server(app: tauri::AppHandle) -> Result<(), String> {
     
     println!("✓ imalink-core server started successfully on http://localhost:8765");
     Ok(())
+}
+
+fn stop_core_server(app: &tauri::AppHandle) {
+    if let Some(core_state) = app.try_state::<Mutex<CoreProcess>>() {
+        if let Ok(mut state) = core_state.lock() {
+            if let Some(child) = state.child.take() {
+                println!("Stopping imalink-core process (PID: {:?})...", child.pid());
+                match child.kill() {
+                    Ok(_) => println!("✓ imalink-core stopped successfully"),
+                    Err(e) => eprintln!("Failed to stop imalink-core: {}", e),
+                }
+            }
+        }
+    }
 }
 
 // ===== Web Gallery Integration =====
